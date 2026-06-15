@@ -6,7 +6,15 @@
 
 > 注：游戏内文本现已全部为英文；本文档为中文说明。
 
-![MineJS 游戏截图](test/final.png)
+![MineJS 标题界面](test/title.png)
+
+## 截图
+
+| 游戏画面 | 第三人称 | 海岸 |
+|:---:|:---:|:---:|
+| ![游戏画面](test/final.png) | ![第三人称](test/third.png) | ![海岸](test/ocean.png) |
+| **创造模式物品栏** | **合成与熔炼** | **TNT 爆炸** |
+| ![创造模式](test/creative.png) | ![熔炉](test/furn.png) | ![爆炸](test/boom.png) |
 
 ## 怎么玩
 

@@ -4,7 +4,15 @@
 
 A zero-dependency, pure-WebGL2 Minecraft remake. Every texture is drawn procedurally in code — no external assets.
 
-![MineJS screenshot](test/final.png)
+![MineJS title screen](test/title.png)
+
+## Screenshots
+
+| Gameplay | Third person | Coastline |
+|:---:|:---:|:---:|
+| ![Gameplay](test/final.png) | ![Third person](test/third.png) | ![Ocean coastline](test/ocean.png) |
+| **Creative inventory** | **Crafting & smelting** | **TNT & explosions** |
+| ![Creative inventory](test/creative.png) | ![Furnace](test/furn.png) | ![Explosion](test/boom.png) |
 
 ## How to play
 
