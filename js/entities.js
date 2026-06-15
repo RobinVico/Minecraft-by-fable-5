@@ -1,4 +1,4 @@
-// ============ entities.js — 实体系统: 物理/掉落物/TNT/生物AI/粒子 ============
+// ============ entities.js — entity system: physics/item drops/TNT/mob AI/particles ============
 'use strict';
 var Ent = (function () {
   var B = Blocks.B, IT = Blocks.IT, BL = Blocks.BLOCKS;
@@ -9,7 +9,7 @@ var Ent = (function () {
   var world = null, player = null;
   var scratchBoxes = [];
 
-  // ---------- 物种 ----------
+  // ---------- species ----------
   var SPECIES = {
     pig: { model: 'pig', skin: 'skin_pig', w: 0.45, h: 0.9, hp: 10, speed: 1.6, passive: true,
       drops: function (r) { return [{ id: IT.PORK_RAW, n: 1 + (r() * 3 | 0) }]; } },
@@ -27,12 +27,12 @@ var Ent = (function () {
     creeper: { model: 'creeper', skin: 'skin_creeper', w: 0.3, h: 1.6, hp: 20, speed: 2.4, hostile: true,
       drops: function (r) { var n = (r() * 3) | 0; return n ? [{ id: IT.GUNPOWDER, n: n }] : []; } }
   };
-  var SPECIES_NAMES = { pig: '猪', cow: '牛', sheep: '羊', zombie: '僵尸', creeper: '苦力怕' };
+  var SPECIES_NAMES = { pig: 'Pig', cow: 'Cow', sheep: 'Sheep', zombie: 'Zombie', creeper: 'Creeper' };
 
   function init(w, p) {
     world = w; player = p;
     list = []; particles = [];
-    // 世界钩子
+    // world hooks
     w.hooks.drop = function (x, y, z, stack) { spawnItem(x, y, z, stack, true); };
     w.hooks.fall = function (x, y, z, id, meta) {
       list.push({
@@ -51,14 +51,14 @@ var Ent = (function () {
     w.hooks.particles = function (type, x, y, z, n) { spawnParticles(type, x, y, z, n, {}); };
   }
 
-  // ---------- 通用物理 ----------
+  // ---------- general physics ----------
   function overlap(a, b) {
     return a[0] < b[3] && a[3] > b[0] && a[1] < b[4] && a[4] > b[1] && a[2] < b[5] && a[5] > b[2];
   }
   function entBox(e) {
     return [e.pos[0] - e.w, e.pos[1], e.pos[2] - e.w, e.pos[0] + e.w, e.pos[1] + e.h, e.pos[2] + e.w];
   }
-  // 逐轴移动 + 推出式碰撞; 返回碰撞标志 {x,y,z}
+  // per-axis movement + push-out collision; returns collision flags {x,y,z}
   function moveCollide(e, dx, dy, dz) {
     var hit = { x: false, y: false, z: false };
     var steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) / 0.4));
@@ -137,7 +137,7 @@ var Ent = (function () {
     return hit;
   }
 
-  // 危险方块接触 (岩浆/仙人掌)
+  // contact with dangerous blocks (Lava/Cactus)
   function hazards(e) {
     if (e.inLava) {
       e.fireT = 60;
@@ -151,7 +151,7 @@ var Ent = (function () {
         spawnParticles('flame', e.pos[0], e.pos[1] + e.h * 0.6, e.pos[2], 1, { spread: e.w, vel: 0.4, life: 0.5, size: 0.12, gravity: -2 });
       }
     }
-    // 仙人掌
+    // Cactus
     var box = entBox(e);
     for (var x = Math.floor(box[0] - 0.05); x <= Math.floor(box[3] + 0.05); x++) {
       for (var z = Math.floor(box[2] - 0.05); z <= Math.floor(box[5] + 0.05); z++) {
@@ -165,7 +165,7 @@ var Ent = (function () {
     if (e.cactusCD > 0) e.cactusCD--;
   }
 
-  // ---------- 掉落物 ----------
+  // ---------- dropped items ----------
   function spawnItem(x, y, z, stack, scatter) {
     if (!stack || stack.n <= 0) return;
     var a = Math.random() * Math.PI * 2;
@@ -192,7 +192,7 @@ var Ent = (function () {
     if (e.pickupDelay > 0) e.pickupDelay--;
     e.age++;
     if (e.age > 6000 || e.pos[1] < -8) { e.dead = true; return; }
-    // 合并
+    // merge
     if ((e.age & 15) === 0) {
       for (var i = 0; i < list.length; i++) {
         var o = list[i];
@@ -204,7 +204,7 @@ var Ent = (function () {
         if (d2 < 0.8 * 0.8) { e.stack.n += o.stack.n; o.dead = true; }
       }
     }
-    // 磁吸与拾取
+    // magnet attraction and pickup
     if (e.pickupDelay <= 0 && player && !player.dead) {
       var px = player.pos[0] - e.pos[0], py = (player.pos[1] + 0.8) - e.pos[1], pz = player.pos[2] - e.pos[2];
       var d = Math.hypot(px, py, pz);
@@ -224,7 +224,7 @@ var Ent = (function () {
     }
   }
 
-  // ---------- 下落方块 ----------
+  // ---------- falling block ----------
   function fallingTick(e) {
     basePhysics(e, 0.05);
     e.age++;
@@ -264,7 +264,7 @@ var Ent = (function () {
     }
   }
 
-  // ---------- 生物 ----------
+  // ---------- mobs ----------
   function spawnMob(species, x, y, z) {
     var sp = SPECIES[species];
     if (!sp) return null;
@@ -321,12 +321,12 @@ var Ent = (function () {
     basePhysics(e, 0.05);
     hazards(e);
     if (e.pos[1] < -10) { e.kill = true; return; }
-    if (e.inWater) e.vel[1] += 18 * 0.05; // 浮水
+    if (e.inWater) e.vel[1] += 18 * 0.05; // float in water
 
     var pd = player && !player.dead ? Math.hypot(player.pos[0] - e.pos[0], player.pos[1] - e.pos[1], player.pos[2] - e.pos[2]) : 999;
     var dirToP = player ? Math.atan2(-(player.pos[0] - e.pos[0]), -(player.pos[2] - e.pos[2])) : 0;
 
-    // 看向玩家
+    // look at player
     if (pd < 8) {
       var dy2 = (player.pos[1] + 1.6) - (e.pos[1] + e.h * 0.85);
       var hd = Math.hypot(player.pos[0] - e.pos[0], player.pos[2] - e.pos[2]);
@@ -339,7 +339,7 @@ var Ent = (function () {
     var moveSpeed = 0, moveYaw = e.yaw;
 
     if (e.sp.hostile) {
-      // 白昼燃烧
+      // burn in daylight
       if (e.sp.burns && !e.inWater) {
         var hy = Math.floor(e.pos[1] + e.h);
         if (Game.dayFactor() > 0.75 && world.getSky(Math.floor(e.pos[0]), hy, Math.floor(e.pos[2])) >= 15) {
@@ -355,7 +355,7 @@ var Ent = (function () {
           if (pd < 1.4 + e.w + 0.3 && e.attackCD <= 0) {
             e.attackCD = 22;
             var ka = Math.atan2(player.pos[0] - e.pos[0], player.pos[2] - e.pos[2]);
-            player.hurt(e.sp.dmg, Math.sin(ka) * 5, Math.cos(ka) * 5, '僵尸');
+            player.hurt(e.sp.dmg, Math.sin(ka) * 5, Math.cos(ka) * 5, 'Zombie');
           }
         } else if (e.species === 'creeper') {
           if (pd < 2.6) {
@@ -374,7 +374,7 @@ var Ent = (function () {
       }
       e.swell = e.fuse / 30;
     } else {
-      // 被动生物
+      // passive mob
       if (e.fleeT > 0) {
         e.fleeT--;
         moveYaw = Math.atan2(-e.fleeDir[0], -e.fleeDir[1]);
@@ -402,11 +402,11 @@ var Ent = (function () {
       }
     }
 
-    // 转向 + 移动
+    // turn + move
     if (moveSpeed > 0) {
       e.yaw = turnToward(e.yaw, moveYaw, 0.25);
       var fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
-      // 悬崖检查 (被动生物与苦力怕)
+      // cliff check (passive mobs and Creeper)
       var careful = e.sp.passive;
       var blocked = false;
       if (careful && e.onGround) {
@@ -422,7 +422,7 @@ var Ent = (function () {
         var acc = e.onGround ? 8 : 2;
         e.vel[0] += (fx * moveSpeed - e.vel[0]) * Math.min(1, acc * 0.05);
         e.vel[2] += (fz * moveSpeed - e.vel[2]) * Math.min(1, acc * 0.05);
-        // 跳跃
+        // jump
         if (e.onGround && (e.hitWall || e.inWater)) e.vel[1] = e.inWater ? 4 : 7.6;
       }
     }
@@ -433,7 +433,7 @@ var Ent = (function () {
     e.walkAmp = Util.lerp(e.walkAmp, Math.min(1, hsp / 2), 0.2);
     e.walkCycle += hsp * 0.05 * 3.2;
   }
-  // 水平碰撞标志 (basePhysics 内的 hit 已消费, 这里检查贴墙)
+  // horizontal collision flag (the hit inside basePhysics is already consumed, here we check wall contact)
   function moveCollideFlagged(e) {
     var fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
     var px = e.pos[0] + fx * (e.w + 0.15), pz = e.pos[2] + fz * (e.w + 0.15);
@@ -458,7 +458,7 @@ var Ent = (function () {
     return dx * dx + dy * dy + dz * dz;
   }
 
-  // ---------- 爆炸伤害 ----------
+  // ---------- explosion damage ----------
   function applyExplosion(cx, cy, cz, power) {
     var r = power * 2;
     for (var i = 0; i < list.length; i++) {
@@ -479,13 +479,13 @@ var Ent = (function () {
         var pf = 1 - pd / r;
         var pkx = (player.pos[0] - cx) / Math.max(pd, 0.3) * pf * 11;
         var pkz = (player.pos[2] - cz) / Math.max(pd, 0.3) * pf * 11;
-        player.hurt(Math.round(pf * power * 5 + 1), pkx, pkz, '爆炸');
+        player.hurt(Math.round(pf * power * 5 + 1), pkx, pkz, 'explosion');
         player.vel[1] += pf * 9;
       }
     }
   }
 
-  // ---------- 生成器 ----------
+  // ---------- spawner ----------
   var spawnTimer = 0;
   function spawnerTick(activeKeys) {
     spawnTimer++;
@@ -497,7 +497,7 @@ var Ent = (function () {
       var e = list[i];
       if (e.type !== 'mob' || e.dead) continue;
       if (e.sp.hostile) hostiles++; else passives++;
-      // 远距离敌对消失
+      // despawn hostiles at long range
       if (e.sp.hostile && dist2(e.pos, player.pos) > 60 * 60) e.kill = true;
     }
     var keys = Array.from(activeKeys);
@@ -549,7 +549,7 @@ var Ent = (function () {
     return pass(a1) && pass(a2);
   }
 
-  // 初始被动生物 (出生点周围)
+  // initial passive mobs (around the spawn point)
   function populateSpawn(cx, cz) {
     for (var i = 0; i < 8; i++) {
       var x = cx + (Math.random() - 0.5) * 60;
@@ -563,7 +563,7 @@ var Ent = (function () {
     }
   }
 
-  // ---------- 攻击射线 ----------
+  // ---------- attack raycast ----------
   function raycastEntity(ox, oy, oz, dx, dy, dz, maxDist) {
     var best = null, bestT = maxDist;
     for (var i = 0; i < list.length; i++) {
@@ -591,7 +591,7 @@ var Ent = (function () {
     return tmin;
   }
 
-  // ---------- 粒子 ----------
+  // ---------- particles ----------
   function spawnParticles(type, x, y, z, n, opts) {
     opts = opts || {};
     var tile, u, T2 = 16 / 512;
@@ -645,7 +645,7 @@ var Ent = (function () {
       if (p.age > p.life) { particles.splice(i, 1); continue; }
       p.vy -= p.gravity * dt;
       var nx = p.x + p.vx * dt, ny = p.y + p.vy * dt, nz = p.z + p.vz * dt;
-      // 简易碰撞: 撞固体停
+      // simple collision: stop on hitting a solid
       var bid = world.getBlock(Math.floor(nx), Math.floor(ny), Math.floor(nz));
       if (bid && BL[bid].solid) {
         p.vx *= 0.4; p.vz *= 0.4;
@@ -656,12 +656,12 @@ var Ent = (function () {
     }
   }
 
-  // ---------- tick & 绘制 ----------
+  // ---------- tick & draw ----------
   function tick(activeKeys) {
     for (var i = list.length - 1; i >= 0; i--) {
       var e = list[i];
       if (e.kill || (e.dead && e.type !== 'mob')) { list.splice(i, 1); continue; }
-      // 不在已加载列中的实体冻结
+      // freeze entities not in a loaded column
       if (!world.getColumnAt(Math.floor(e.pos[0]), Math.floor(e.pos[2]))) continue;
       switch (e.type) {
         case 'item': if (!e.dead) itemTick(e); else list.splice(i, 1); break;
@@ -674,7 +674,7 @@ var Ent = (function () {
     spawnerTick(activeKeys);
   }
 
-  // 绘制全部实体
+  // draw all entities
   var m1 = M.create(), m2 = M.create();
   function drawAll(R, camYaw, interp) {
     R.beginEntities();
@@ -737,7 +737,7 @@ var Ent = (function () {
       if (deathRot) M.rotateZ(m1, m1, deathRot);
       if (swellS !== 1) M.scale(m1, m1, swellS, swellS, swellS);
       M.translate(m1, m1, p.pivot[0] / 16, p.pivot[1] / 16, p.pivot[2] / 16);
-      // 动画
+      // animation
       var wc = e.walkCycle, amp = e.walkAmp * 0.8;
       switch (p.anim) {
         case 'head':
@@ -756,7 +756,7 @@ var Ent = (function () {
 
   function clearAll() { list = []; particles = []; }
 
-  // 存档
+  // save
   function serialize() {
     var out = [];
     for (var i = 0; i < list.length; i++) {

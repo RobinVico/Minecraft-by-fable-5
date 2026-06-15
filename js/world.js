@@ -1,4 +1,4 @@
-// ============ world.js — 世界存储 / 方块逻辑 / 流体 / 随机tick / 爆炸 / 存档 ============
+// ============ world.js — world storage / block logic / fluid / random tick / explosion / save ============
 'use strict';
 var World = (function () {
   var B = Blocks.B, IT = Blocks.IT, BL = Blocks.BLOCKS;
@@ -13,12 +13,12 @@ var World = (function () {
     this.seed = Util.strSeed(seedStr);
     Gen.init(this.seed);
     this.columns = new Map();
-    this.time = 1000;          // 一天内 tick (0..24000)
+    this.time = 1000;          // tick within a day (0..24000)
     this.day = 0;
     this.tickCount = 0;
     this.fluidQ = [];          // {x,y,z,due}
     this.fluidSet = new Set();
-    this.hooks = {             // 由 main/entities 注入
+    this.hooks = {             // injected by main/entities
       drop: function () {}, igniteTNT: function () {}, explosion: function () {},
       sound: function () {}, particles: function () {}, fall: function () {}
     };
@@ -42,7 +42,7 @@ var World = (function () {
     return col;
   };
 
-  // 生成 (或从存档恢复) 一列
+  // generate (or restore from save) a column
   World.prototype.ensureColumn = function (cx, cz, savedData) {
     var col = this.getColumn(cx, cz);
     if (col && col.state >= 1) return col;
@@ -53,7 +53,7 @@ var World = (function () {
     } else {
       Gen.generateColumn(this, col);
     }
-    // 群系染色缓存
+    // biome tint cache
     for (var lz = 0; lz < 16; lz++) for (var lx = 0; lx < 16; lx++) {
       var t = Gen.tintAt(cx * 16 + lx, cz * 16 + lz);
       var i = (lx | (lz << 4)) * 3;
@@ -62,7 +62,7 @@ var World = (function () {
     Light.initColumn(this, col);
     Light.exchangeBorders(this, col);
     col.dirtyMesh = true;
-    // 邻列网格需重建 (边界面剔除会变)
+    // neighbor columns need remeshing (border face culling changes)
     for (var d = 0; d < 4; d++) {
       var nc = this.getColumn(cx + [1, -1, 0, 0][d], cz + [0, 0, 1, -1][d]);
       if (nc) nc.dirtyMesh = true;
@@ -77,7 +77,7 @@ var World = (function () {
     return col;
   };
 
-  // ---------- 方块访问 ----------
+  // ---------- block access ----------
   World.prototype.getBlock = function (x, y, z) {
     if (y < 0 || y >= 128) return 0;
     var col = this.columns.get(key(x >> 4, z >> 4));
@@ -127,7 +127,7 @@ var World = (function () {
     col.meta[idx] = meta;
     col.modified = true;
 
-    // 方块实体管理
+    // block entity management
     if (col.blockEntities.has(idx)) {
       var keepBE = (isFurnace(old) && isFurnace(id));
       if (!keepBE && old !== id) {
@@ -148,7 +148,7 @@ var World = (function () {
       this.updateNeighbors(x, y, z);
       this.blockUpdate(x, y, z);
     }
-    // 流体调度
+    // fluid scheduling
     if (id === B.WATER || id === B.LAVA) this.scheduleFluid(x, y, z, id === B.WATER ? 5 : 30);
     return true;
   };
@@ -185,7 +185,7 @@ var World = (function () {
     this.blockUpdate(x, y, z + 1); this.blockUpdate(x, y, z - 1);
   };
 
-  // 方块对周围变化的反应
+  // block reaction to surrounding changes
   World.prototype.blockUpdate = function (x, y, z) {
     var id = this.getBlock(x, y, z);
     if (id === 0) return;
@@ -253,7 +253,7 @@ var World = (function () {
   };
 
   World.prototype.torchSupport = function (x, y, z, meta) {
-    // meta: 0=地面 1..4=贴墙 (+x,-x,+z,-z 方向的墙)
+    // meta: 0=on ground 1..4=wall-mounted (wall in +x,-x,+z,-z direction)
     if (meta === 0) {
       var b = BL[this.getBlock(x, y - 1, z)];
       return b && (b.solid && (b.opaque || this.getBlock(x, y - 1, z) === B.GLASS));
@@ -263,7 +263,7 @@ var World = (function () {
     return wb && wb.opaque;
   };
 
-  // 自然破坏 (掉落物品)
+  // natural break (drops items)
   World.prototype.breakNaturally = function (x, y, z) {
     var id = this.getBlock(x, y, z);
     if (!id) return;
@@ -286,8 +286,8 @@ var World = (function () {
     return [{ id: id, n: 1 }];
   };
 
-  // ---------- 射线 (DDA) ----------
-  // 返回 {x,y,z,id, fx,fy,fz(被击面法线), px,py,pz(命中点)} 或 null
+  // ---------- raycast (DDA) ----------
+  // returns {x,y,z,id, fx,fy,fz(hit face normal), px,py,pz(hit point)} or null
   World.prototype.raycast = function (ox, oy, oz, dx, dy, dz, maxDist, hitLiquid) {
     var x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
     var stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1, stepZ = dz > 0 ? 1 : -1;
@@ -322,7 +322,7 @@ var World = (function () {
     return null;
   };
 
-  // ---------- 碰撞箱查询 ----------
+  // ---------- collision box query ----------
   World.prototype.getCollisions = function (minX, minY, minZ, maxX, maxY, maxZ, out) {
     out = out || [];
     out.length = 0;
@@ -343,7 +343,7 @@ var World = (function () {
     return out;
   };
 
-  // ---------- 流体 ----------
+  // ---------- fluid ----------
   World.prototype.scheduleFluid = function (x, y, z, delay) {
     var k = x + ',' + y + ',' + z;
     if (this.fluidSet.has(k)) return;
@@ -369,16 +369,16 @@ var World = (function () {
     var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     var i, d;
 
-    // 水火相容 → 石化
+    // water meets lava → petrify
     for (i = 0; i < 6; i++) {
       var dd = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]][i];
       if (this.getBlock(x + dd[0], y + dd[1], z + dd[2]) === other) {
-        if (!isWater) { // 本格是岩浆
+        if (!isWater) { // this cell is lava
           this.setBlock(x, y, z, meta === 0 ? B.OBSIDIAN : B.COBBLE);
           this.hooks.sound('fizz', x, y, z);
           this.hooks.particles('smoke', x + 0.5, y + 1, z + 0.5, 8);
           return;
-        } else if (dd[1] !== 1) { // 水邻岩浆(非上方) → 处理那个岩浆
+        } else if (dd[1] !== 1) { // water next to lava (not above) → handle that lava
           var lx2 = x + dd[0], ly2 = y + dd[1], lz2 = z + dd[2];
           var lm = this.getMeta(lx2, ly2, lz2);
           this.setBlock(lx2, ly2, lz2, lm === 0 ? B.OBSIDIAN : B.COBBLE);
@@ -388,10 +388,10 @@ var World = (function () {
     }
     if (this.getBlock(x, y, z) !== id) return;
 
-    // 重算流动等级
+    // recompute flow level
     if (meta !== 0) {
       var best = 99;
-      if (this.getBlock(x, y + 1, z) === id) best = -1;          // 上方来水 → 瀑布
+      if (this.getBlock(x, y + 1, z) === id) best = -1;          // fluid from above → waterfall
       for (i = 0; i < 4; i++) {
         d = dirs[i];
         if (this.getBlock(x + d[0], y, z + d[1]) === id) {
@@ -401,7 +401,7 @@ var World = (function () {
         }
       }
       var newMeta = best === -1 ? 8 : best + step;
-      // 无限水源: 2 个水源水平相邻 + 下方实体
+      // infinite water source: 2 source blocks horizontally adjacent + solid below
       if (isWater) {
         var srcN = 0;
         for (i = 0; i < 4; i++) {
@@ -419,7 +419,7 @@ var World = (function () {
         }
         this.setBlock(x, y, z, id, newMeta);
         meta = newMeta;
-        // 等级变化波及邻居
+        // level change propagates to neighbors
         for (i = 0; i < 4; i++) {
           d = dirs[i];
           if (this.getBlock(x + d[0], y, z + d[1]) === id) this.scheduleFluid(x + d[0], y, z + d[1], delay);
@@ -428,7 +428,7 @@ var World = (function () {
       }
     }
 
-    // 向下流
+    // flow downward
     var below = this.getBlock(x, y - 1, z);
     if (y > 0) {
       if (canFluidReplace(below)) {
@@ -438,15 +438,15 @@ var World = (function () {
         return;
       }
       if (below === other) {
-        // 流体落到另一种流体上
+        // fluid falls onto the other fluid
         var bm = this.getMeta(x, y - 1, z);
         this.setBlock(x, y - 1, z, isWater ? (bm === 0 ? B.OBSIDIAN : B.COBBLE) : B.STONE);
         this.hooks.sound('fizz', x, y - 1, z);
       }
-      if (below === id) return; // 落入同流体, 不侧漫
+      if (below === id) return; // falls into same fluid, no lateral spread
     }
 
-    // 侧向蔓延
+    // lateral spread
     var eff = (meta & 8) ? 0 : (meta & 7);
     var next = eff + step;
     if (next > maxL) return;
@@ -474,7 +474,7 @@ var World = (function () {
     }
   };
 
-  // ---------- 随机 tick ----------
+  // ---------- random tick ----------
   World.prototype.randomTickColumn = function (col, rng) {
     var wx0 = col.cx * 16, wz0 = col.cz * 16;
     for (var n = 0; n < 8; n++) {
@@ -531,7 +531,7 @@ var World = (function () {
   };
 
   World.prototype.growTree = function (x, y, z, sapId, rng) {
-    // 空间检查
+    // space check
     for (var dy = 1; dy < 5; dy++) {
       var id2 = this.getBlock(x, y + dy, z);
       if (id2 !== B.AIR && !(BL[id2] && BL[id2].cutout)) return;
@@ -549,7 +549,7 @@ var World = (function () {
     });
   };
 
-  // ---------- 熔炉 ----------
+  // ---------- furnace ----------
   World.prototype.furnaceTick = function (col, idx, be) {
     var x = col.cx * 16 + (idx & 15), z = col.cz * 16 + ((idx >> 4) & 15), y = idx >> 8;
     var inSt = be.items[0], fuelSt = be.items[1], outSt = be.items[2];
@@ -585,14 +585,14 @@ var World = (function () {
       }
       if (!canSmelt) be.prog = 0;
     }
-    // 点燃状态切换
+    // lit state toggle
     var id = col.blocks[idx];
     var lit = be.burn > 0;
     if (lit && id === B.FURNACE) this.setBlock(x, y, z, B.FURNACE_LIT, col.meta[idx]);
     else if (!lit && id === B.FURNACE_LIT) this.setBlock(x, y, z, B.FURNACE, col.meta[idx]);
   };
 
-  // ---------- 爆炸 ----------
+  // ---------- explosion ----------
   World.prototype.explode = function (cx, cy, cz, power) {
     var R = Math.ceil(power * 1.4);
     var x0 = Math.floor(cx - R), x1 = Math.floor(cx + R);
@@ -607,14 +607,14 @@ var World = (function () {
       var strength = power * (1 - dist / (power * 1.4)) * (0.85 + Math.random() * 0.3) - b.resist * 0.18;
       if (strength > 0) destroyed.push(x, y, z, id);
     }
-    // 批量清除
+    // batch clear
     var i;
     for (i = 0; i < destroyed.length; i += 4) {
       var bx = destroyed[i], by = destroyed[i + 1], bz = destroyed[i + 2], bid = destroyed[i + 3];
       var col = this.getColumnAt(bx, bz);
       if (!col) continue;
       var idx = (bx & 15) | ((bz & 15) << 4) | (by << 8);
-      // 方块实体溢出
+      // block entity spill
       if (col.blockEntities.has(idx)) {
         this.spillBE(bx, by, bz, col.blockEntities.get(idx));
         col.blockEntities.delete(idx);
@@ -631,7 +631,7 @@ var World = (function () {
       col.meta[idx] = 0;
       col.modified = true;
     }
-    // 光照与网格
+    // lighting and mesh
     Light.relightRegion(this, x0 - 1, y0 - 1, z0 - 1, x1 + 1, y1 + 1, z1 + 1);
     for (var mx = (x0 - 1) >> 4; mx <= (x1 + 1) >> 4; mx++) {
       for (var mz = (z0 - 1) >> 4; mz <= (z1 + 1) >> 4; mz++) {
@@ -639,7 +639,7 @@ var World = (function () {
         if (mc) mc.dirtyMesh = true;
       }
     }
-    // 邻居更新 (支撑/流体)
+    // neighbor updates (support/fluid)
     for (var ux = x0 - 1; ux <= x1 + 1; ux++) for (var uz = z0 - 1; uz <= z1 + 1; uz++)
       for (var uy = Math.max(0, y0 - 1); uy <= Math.min(127, y1 + 1); uy++) {
         this.blockUpdate(ux, uy, uz);
@@ -649,14 +649,14 @@ var World = (function () {
     return destroyed.length / 4;
   };
 
-  // ---------- 世界 tick (20Hz) ----------
+  // ---------- world tick (20Hz) ----------
   World.prototype.tick = function (activeColKeys, rng) {
     this.tickCount++;
     this.time++;
     if (this.time >= 24000) { this.time = 0; this.day++; }
     rng = rng || Math.random;
 
-    // 流体
+    // fluid
     if (this.fluidQ.length) {
       var rest = [];
       var processed = 0;
@@ -671,7 +671,7 @@ var World = (function () {
       this.fluidQ = rest;
     }
 
-    // 随机 tick + 方块实体
+    // random tick + block entities
     var self = this;
     activeColKeys.forEach(function (k) {
       var col = self.columns.get(k);
@@ -685,7 +685,7 @@ var World = (function () {
     });
   };
 
-  // ---------- 序列化 ----------
+  // ---------- serialization ----------
   function rleEncode(arr) {
     var out = [];
     var i = 0;
@@ -736,7 +736,7 @@ var World = (function () {
     if (data.be) {
       for (var k in data.be) col.blockEntities.set(parseInt(k, 10), data.be[k]);
     }
-    col.modified = true; // 来自存档的列保持已修改标记
+    col.modified = true; // column from save keeps the modified flag
   };
 
   World.F_LIGHT = F_LIGHT; World.F_MESH = F_MESH; World.F_UPDATE = F_UPDATE; World.ALL = ALL;

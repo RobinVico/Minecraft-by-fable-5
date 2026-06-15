@@ -1,5 +1,5 @@
-// headless Chrome 截图 + console 错误收集
-// 用法: node test/shot.js <url后缀> <输出名> [等待ms] [脚本]
+// headless Chrome screenshot + console error collection
+// Usage: node test/shot.js <url suffix> <output name> [wait ms] [script]
 'use strict';
 var { execFile } = require('child_process');
 var path = require('path');
@@ -35,12 +35,12 @@ execFile(CHROME, args, { timeout: 120000, maxBuffer: 20 * 1024 * 1024 }, functio
       !/deprecated|GroupMarker|gpu_|Fontconfig|dbus|DevTools|GPU stall|fallback|swiftshader.*warn/i.test(l);
   });
   console.log('URL:', url);
-  console.log('截图:', fs.existsSync(out) ? out + ' (' + fs.statSync(out).size + ' bytes)' : '失败!');
+  console.log('Screenshot:', fs.existsSync(out) ? out + ' (' + fs.statSync(out).size + ' bytes)' : 'failed!');
   if (interesting.length) {
-    console.log('--- console 消息 ---');
+    console.log('--- console messages ---');
     interesting.slice(0, 40).forEach(function (l) { console.log(l.trim().slice(0, 300)); });
   } else {
-    console.log('无 console 错误');
+    console.log('No console errors');
   }
   if (err && !fs.existsSync(out)) console.log('chrome err:', String(err).slice(0, 400));
 });

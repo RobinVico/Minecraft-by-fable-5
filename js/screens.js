@@ -1,4 +1,4 @@
-// ============ screens.js — 标题 / 暂停 / 选项 / 加载 界面 ============
+// ============ screens.js — title / pause / options / loading screens ============
 'use strict';
 var Screens = (function () {
   var opts = {
@@ -10,9 +10,9 @@ var Screens = (function () {
       var o = JSON.parse(saved);
       for (var k in opts) if (o[k] !== undefined) opts[k] = o[k];
     }
-  } catch (e) { /* 忽略 */ }
+  } catch (e) { /* ignore */ }
   function saveOpts() {
-    try { localStorage.setItem('minejs:options', JSON.stringify(opts)); } catch (e) { /* 满 */ }
+    try { localStorage.setItem('minejs:options', JSON.stringify(opts)); } catch (e) { /* full */ }
   }
 
   function $(id) { return document.getElementById(id); }
@@ -23,30 +23,30 @@ var Screens = (function () {
   }
 
   function init() {
-    // 标题
+    // Title
     $('btn-new-world').onclick = function () { Sfx.play('click', {}); showCreate(); };
-    // 创建世界
+    // Create world
     $('btn-create-go').onclick = function () {
       Sfx.play('click', {});
-      var name = $('world-name').value.trim() || '新的世界';
+      var name = $('world-name').value.trim() || 'New World';
       var seed = $('world-seed').value.trim() || String((Math.random() * 99999999) | 0);
       var mode = $('world-mode').value;
       hideAll();
       Game.createWorld(name, seed, mode);
     };
     $('btn-create-back').onclick = function () { Sfx.play('click', {}); hideAll(); showTitle(); };
-    // 暂停
+    // Pause
     $('btn-resume').onclick = function () { Sfx.play('click', {}); Game.resume(); };
     $('btn-options').onclick = function () { Sfx.play('click', {}); hide('pause-screen'); showOptions(true); };
     $('btn-quit').onclick = function () { Sfx.play('click', {}); Game.quitToTitle(); };
-    // 选项
+    // Options
     $('btn-options-back').onclick = function () {
       Sfx.play('click', {});
       hide('options-screen');
       if (Game.isPlaying()) show('pause-screen');
       else showTitle();
     };
-    bindSlider('opt-dist', 'renderDist', function (v) { return v + ' 区块'; });
+    bindSlider('opt-dist', 'renderDist', function (v) { return v + ' chunks'; });
     bindSlider('opt-fov', 'fov', function (v) { return v + '°'; });
     bindSlider('opt-sens', 'sens', function (v) { return (v * 100).toFixed(0) + '%'; });
     bindSlider('opt-vol', 'volume', function (v) {
@@ -75,7 +75,7 @@ var Screens = (function () {
     };
   }
 
-  // ---------- 标题 ----------
+  // ---------- Title ----------
   function showTitle() {
     hideAll();
     show('title-screen');
@@ -85,7 +85,7 @@ var Screens = (function () {
     if (!worlds.length) {
       var empty = document.createElement('div');
       empty.className = 'world-empty';
-      empty.textContent = '还没有世界, 创建一个吧!';
+      empty.textContent = 'No worlds yet, create one!';
       list.appendChild(empty);
     }
     worlds.forEach(function (w) {
@@ -93,10 +93,10 @@ var Screens = (function () {
       row.className = 'world-row';
       var info = document.createElement('div');
       info.className = 'world-info';
-      info.innerHTML = '<b>' + escapeHtml(w.name) + '</b><span>种子: ' + escapeHtml(String(w.seed)) +
-        ' · ' + (w.mode === 'creative' ? '创造' : '生存') + ' · 第' + ((w.day || 0) + 1) + '天</span>';
+      info.innerHTML = '<b>' + escapeHtml(w.name) + '</b><span>Seed: ' + escapeHtml(String(w.seed)) +
+        ' · ' + (w.mode === 'creative' ? 'Creative' : 'Survival') + ' · Day ' + ((w.day || 0) + 1) + '</span>';
       var btnPlay = document.createElement('button');
-      btnPlay.textContent = '进入';
+      btnPlay.textContent = 'Play';
       btnPlay.className = 'mc-btn small';
       btnPlay.onclick = function () {
         Sfx.play('click', {});
@@ -104,11 +104,11 @@ var Screens = (function () {
         Game.loadWorld(w.id);
       };
       var btnDel = document.createElement('button');
-      btnDel.textContent = '删除';
+      btnDel.textContent = 'Delete';
       btnDel.className = 'mc-btn small danger';
       btnDel.onclick = function () {
         Sfx.play('click', {});
-        if (confirm('确定删除世界 "' + w.name + '"? 无法恢复!')) {
+        if (confirm('Delete world "' + w.name + '"? This cannot be undone!')) {
           Game.deleteWorld(w.id);
           showTitle();
         }

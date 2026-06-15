@@ -1,15 +1,15 @@
-// ============ mesher.js — 区块网格生成 (面剔除 + AO + 平滑光照) ============
+// ============ mesher.js — chunk mesh generation (face culling + AO + smooth lighting) ============
 'use strict';
 var Mesher = (function () {
   var B = Blocks.B, BL = Blocks.BLOCKS;
 
-  // 不透明查找表 (AO 与剔除用)
+  // opaque lookup table (for AO and culling)
   var OPAQ = new Uint8Array(256);
   (function () {
     for (var i = 0; i < BL.length; i++) if (BL[i]) OPAQ[i] = (BL[i].opaque && BL[i].solid) ? 1 : 0;
   })();
 
-  // 面: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z
+  // faces: 0:+x 1:-x 2:+y 3:-y 4:+z 5:-z
   var FACES = [
     { n: [1, 0, 0], u: [0, 0, -1], v: [0, -1, 0], o: [1, 1, 1], shade: 0.65 },
     { n: [-1, 0, 0], u: [0, 0, 1], v: [0, -1, 0], o: [0, 1, 0], shade: 0.65 },
@@ -19,7 +19,7 @@ var Mesher = (function () {
     { n: [0, 0, -1], u: [-1, 0, 0], v: [0, -1, 0], o: [1, 1, 0], shade: 0.82 }
   ];
   var AO_MUL = [0.45, 0.66, 0.84, 1.0];
-  var T = 16 / 512; // tile uv 尺寸
+  var T = 16 / 512; // tile uv size
 
   function Builder() {
     this.pos = []; this.uv = []; this.light = []; this.tint = []; this.idx = []; this.vc = 0;
@@ -53,7 +53,7 @@ var Mesher = (function () {
   function buildColumn(world, col) {
     var cx = col.cx, cz = col.cz;
     var wx0 = cx * 16, wz0 = cz * 16;
-    // 3x3 邻列缓存
+    // 3x3 neighbor column cache
     var cols3 = [];
     for (var dz = -1; dz <= 1; dz++) for (var dx = -1; dx <= 1; dx++) {
       cols3.push(world.getColumn(cx + dx, cz + dz));
@@ -85,8 +85,8 @@ var Mesher = (function () {
 
     var opq = new Builder(), trans = new Builder();
 
-    // 通用 cube 面发射 (含 AO + 平滑光照)
-    // hTop: 顶部 y 坐标 (液体用), 默认为 1
+    // generic cube face emission (with AO + smooth lighting)
+    // hTop: top y coordinate (for liquids), defaults to 1
     function emitFace(bld, x, y, z, f, tileI, tintRGB, hTop, noAO) {
       var F = FACES[f];
       var uvb = Tex.uv(tileI);
@@ -97,14 +97,14 @@ var Mesher = (function () {
       for (var ci = 0; ci < 4; ci++) {
         var s = (ci === 1 || ci === 2) ? 1 : 0;
         var t = (ci === 2 || ci === 3) ? 1 : 0;
-        // 位置
+        // position
         var px = F.o[0] + s * F.u[0] + t * F.v[0];
         var py = F.o[1] + s * F.u[1] + t * F.v[1];
         var pz = F.o[2] + s * F.u[2] + t * F.v[2];
         if (hTop !== 1 && py === 1) py = hTop;
         vs.push([x - wx0 + px, y + py, z - wz0 + pz]);
         uvs.push([u0 + s * T, v0 + t * T]);
-        // AO + 光照采样
+        // AO + light sampling
         var du = s ? F.u : [-F.u[0], -F.u[1], -F.u[2]];
         var dv = t ? F.v : [-F.v[0], -F.v[1], -F.v[2]];
         var s1 = OPAQ[gb(nx + du[0], ny + du[1], nz + du[2])];
@@ -113,7 +113,7 @@ var Mesher = (function () {
         var ao = (s1 && s2) ? 0 : 3 - (s1 + s2 + sc);
         var aoF = noAO ? 1 : AO_MUL[ao];
         aoSum[ci] = ao;
-        // 光照平均
+        // light averaging
         var skySum = gsky(nx, ny, nz), blkSum = gblk(nx, ny, nz), cnt = 1;
         if (!s1) { skySum += gsky(nx + du[0], ny + du[1], nz + du[2]); blkSum += gblk(nx + du[0], ny + du[1], nz + du[2]); cnt++; }
         if (!s2) { skySum += gsky(nx + dv[0], ny + dv[1], nz + dv[2]); blkSum += gblk(nx + dv[0], ny + dv[1], nz + dv[2]); cnt++; }
@@ -129,7 +129,7 @@ var Mesher = (function () {
       bld.quad(vs, uvs, ls, tintRGB, flip);
     }
 
-    // 自定义四边形 (本格光照, 无AO)
+    // custom quad (this cell's light, no AO)
     function emitQuad(bld, x, y, z, pts, uvr, tintRGB, both, shade) {
       shade = shade || 1;
       var sky = gsky(x, y, z), blk = gblk(x, y, z);
@@ -153,7 +153,7 @@ var Mesher = (function () {
       var b = Tex.uv(tileI);
       return [[b[0], b[1]], [b[0] + T, b[1]], [b[0] + T, b[1] + T], [b[0], b[1] + T]];
     }
-    // 子区域 uv (像素): px0..px1, py0..py1
+    // sub-region uv (pixels): px0..px1, py0..py1
     function subUV(tileI, px0, py0, px1, py1) {
       var b = Tex.uv(tileI);
       var s = T / 16;
@@ -166,7 +166,7 @@ var Mesher = (function () {
       return Math.max(0.135, (8 - (meta & 7)) / 9);
     }
 
-    var FACING_TO_FACE = [4, 5, 0, 1]; // meta 朝向 → 面索引
+    var FACING_TO_FACE = [4, 5, 0, 1]; // meta facing → face index
 
     for (var y = 0; y < 128; y++) {
       for (var lz = 0; lz < 16; lz++) {
@@ -197,7 +197,7 @@ var Mesher = (function () {
                 var faceTint = (b.tint && (!grassTopOnly || f === 2)) ? tint : WHITE;
                 var bld = b.transp ? trans : opq;
                 if (isCactus && f < 6 && f !== 2 && f !== 3) {
-                  // 侧面内缩 1/16
+                  // inset sides by 1/16
                   var inset = 1 / 16;
                   var pts = [];
                   var Fc2 = FACES[f];
@@ -249,7 +249,7 @@ var Mesher = (function () {
             }
             case 'torch': {
               var tt = Tex.idx('torch');
-              // 偏移与倾斜 (贴墙)
+              // offset and lean (wall-mounted)
               var ox = 0, oz = 0, lean = null;
               if (meta >= 1 && meta <= 4) {
                 var wd = [[1, 0], [-1, 0], [0, 1], [0, -1]][meta - 1];
@@ -273,7 +273,7 @@ var Mesher = (function () {
                 var k = (ht - p[1]) * 0.5;
                 return [p[0] + ox + lean[0] * k * 0.8, p[1] + 0.12, p[2] + oz + lean[1] * k * 0.8];
               }
-              // 四侧
+              // four sides
               var quads = [
                 [[x0t, ht, x0t], [x1t, ht, x0t], [x1t, 0, x0t], [x0t, 0, x0t]],
                 [[x1t, ht, x1t], [x0t, ht, x1t], [x0t, 0, x1t], [x1t, 0, x1t]],
@@ -305,9 +305,9 @@ var Mesher = (function () {
             case 'snow': {
               var sh = 0.125;
               var stile = b.faces[0];
-              // 顶面
+              // top face
               emitFace(opq, x, y, z, 2, stile, WHITE, sh, false);
-              // 四侧 2px 条
+              // four side 2px strips
               var sUV = subUV(stile, 0, 14, 16, 16);
               var sq = [
                 [[0, sh, 0], [1, sh, 0], [1, 0, 0], [0, 0, 0]],

@@ -1,8 +1,8 @@
-// ============ blocks.js — 方块/物品/配方/熔炼/燃料 注册表 ============
+// ============ blocks.js — block/item/recipe/smelting/fuel registry ============
 'use strict';
 var Blocks = (function () {
 
-  // ---------- 方块 ID ----------
+  // ---------- block ID ----------
   var B = {
     AIR: 0, STONE: 1, GRASS: 2, DIRT: 3, COBBLE: 4, PLANKS_OAK: 5, SAPLING_OAK: 6,
     BEDROCK: 7, WATER: 8, LAVA: 9, SAND: 10, GRAVEL: 11, ORE_GOLD: 12, ORE_IRON: 13,
@@ -18,7 +18,7 @@ var Blocks = (function () {
     MOSSY_COBBLE: 55, FURNACE_LIT: 56
   };
 
-  // ---------- 物品 ID (>=100) ----------
+  // ---------- item ID (>=100) ----------
   var IT = {
     STICK: 100, COAL: 101, CHARCOAL: 102, IRON_INGOT: 103, GOLD_INGOT: 104,
     DIAMOND: 105, FLINT: 106, SEEDS: 107, WHEAT: 108, BREAD: 109, APPLE: 110,
@@ -33,9 +33,9 @@ var Blocks = (function () {
     PICK_DIAMOND: 150, AXE_DIAMOND: 151, SHOVEL_DIAMOND: 152, HOE_DIAMOND: 153, SWORD_DIAMOND: 154
   };
 
-  // ---------- 方块规格 ----------
-  // 默认值: solid=true opaque=true opacity=15 hard=1 tool=null tier=0 light=0
-  //         render='cube' sound='stone' drops=自身
+  // ---------- block specs ----------
+  // defaults: solid=true opaque=true opacity=15 hard=1 tool=null tier=0 light=0
+  //         render='cube' sound='stone' drops=itself
   var BLOCKS = [];
   function def(id, spec) {
     var b = {
@@ -44,52 +44,52 @@ var Blocks = (function () {
       opaque: spec.opaque !== undefined ? spec.opaque : true,
       opacity: spec.opacity !== undefined ? spec.opacity : 15,
       hard: spec.hard !== undefined ? spec.hard : 1,
-      tool: spec.tool || null,           // 有效工具类型
-      tier: spec.tier || 0,              // 掉落所需工具等级(配合 tool)
-      needTool: spec.needTool || false,  // true: 无对应工具不掉落
-      drops: spec.drops || null,         // fn(meta, rng) => [{id,n}] ; null=掉自身
+      tool: spec.tool || null,           // valid tool type
+      tier: spec.tier || 0,              // tool tier required to drop (pairs with tool)
+      needTool: spec.needTool || false,  // true: no drop without the matching tool
+      drops: spec.drops || null,         // fn(meta, rng) => [{id,n}] ; null=drops itself
       light: spec.light || 0,
       render: spec.render || 'cube',
       sound: spec.sound || 'stone',
-      tint: spec.tint || 0,              // 1=随群系染色
-      cutout: spec.cutout || false,      // 镂空贴图(树叶/植物)
-      transp: spec.transp || false,      // 半透明 pass (水/冰/玻璃)
+      tint: spec.tint || 0,              // 1=tinted by biome
+      cutout: spec.cutout || false,      // cutout texture (leaves/plants)
+      transp: spec.transp || false,      // translucent pass (water/ice/glass)
       gravity: spec.gravity || false,
       climb: spec.climb || false,
-      replaceable: spec.replaceable || false, // 放置方块时可被替换(草/花/水)
-      box: spec.box !== undefined ? spec.box : null, // null 默认: solid?全箱:无
-      resist: spec.resist !== undefined ? spec.resist : (spec.hard || 1), // 抗爆
-      facing: spec.facing || false       // 放置时记录朝向 meta(0-3)
+      replaceable: spec.replaceable || false, // replaceable when placing a block (grass/flower/water)
+      box: spec.box !== undefined ? spec.box : null, // null default: solid?full box:none
+      resist: spec.resist !== undefined ? spec.resist : (spec.hard || 1), // blast resistance
+      facing: spec.facing || false       // record facing meta when placed (0-3)
     };
     BLOCKS[id] = b;
   }
 
-  def(B.AIR, { name: '空气', solid: false, opaque: false, opacity: 0, render: 'none', hard: 0 });
-  def(B.STONE, { name: '石头', tex: { all: 'stone' }, hard: 1.5, tool: 'pick', needTool: true, resist: 6,
+  def(B.AIR, { name: 'Air', solid: false, opaque: false, opacity: 0, render: 'none', hard: 0 });
+  def(B.STONE, { name: 'Stone', tex: { all: 'stone' }, hard: 1.5, tool: 'pick', needTool: true, resist: 6,
     drops: function () { return [{ id: B.COBBLE, n: 1 }]; } });
-  def(B.GRASS, { name: '草方块', tex: { top: 'grass_top', bottom: 'dirt', side: 'grass_side' },
+  def(B.GRASS, { name: 'Grass Block', tex: { top: 'grass_top', bottom: 'dirt', side: 'grass_side' },
     hard: 0.6, tool: 'shovel', sound: 'grass', tint: 1,
     drops: function () { return [{ id: B.DIRT, n: 1 }]; } });
-  def(B.DIRT, { name: '泥土', tex: { all: 'dirt' }, hard: 0.5, tool: 'shovel', sound: 'gravel' });
-  def(B.COBBLE, { name: '圆石', tex: { all: 'cobble' }, hard: 2, tool: 'pick', needTool: true, resist: 6 });
-  def(B.PLANKS_OAK, { name: '橡木木板', tex: { all: 'planks_oak' }, hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
-  def(B.SAPLING_OAK, { name: '橡树树苗', tex: { all: 'sapling_oak' }, solid: false, opaque: false, opacity: 0,
+  def(B.DIRT, { name: 'Dirt', tex: { all: 'dirt' }, hard: 0.5, tool: 'shovel', sound: 'gravel' });
+  def(B.COBBLE, { name: 'Cobblestone', tex: { all: 'cobble' }, hard: 2, tool: 'pick', needTool: true, resist: 6 });
+  def(B.PLANKS_OAK, { name: 'Oak Planks', tex: { all: 'planks_oak' }, hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
+  def(B.SAPLING_OAK, { name: 'Oak Sapling', tex: { all: 'sapling_oak' }, solid: false, opaque: false, opacity: 0,
     hard: 0, render: 'cross', sound: 'grass', cutout: true, replaceable: false });
-  def(B.BEDROCK, { name: '基岩', tex: { all: 'bedrock' }, hard: -1, resist: 99999 });
-  def(B.WATER, { name: '水', tex: { all: 'water' }, solid: false, opaque: false, opacity: 2, hard: -1,
+  def(B.BEDROCK, { name: 'Bedrock', tex: { all: 'bedrock' }, hard: -1, resist: 99999 });
+  def(B.WATER, { name: 'Water', tex: { all: 'water' }, solid: false, opaque: false, opacity: 2, hard: -1,
     render: 'liquid', transp: true, replaceable: true, resist: 100 });
-  def(B.LAVA, { name: '岩浆', tex: { all: 'lava' }, solid: false, opaque: false, opacity: 0, hard: -1,
+  def(B.LAVA, { name: 'Lava', tex: { all: 'lava' }, solid: false, opaque: false, opacity: 0, hard: -1,
     render: 'liquid', light: 15, transp: true, replaceable: true, resist: 100 });
-  def(B.SAND, { name: '沙子', tex: { all: 'sand' }, hard: 0.5, tool: 'shovel', sound: 'sand', gravity: true });
-  def(B.GRAVEL, { name: '沙砾', tex: { all: 'gravel' }, hard: 0.6, tool: 'shovel', sound: 'gravel', gravity: true,
+  def(B.SAND, { name: 'Sand', tex: { all: 'sand' }, hard: 0.5, tool: 'shovel', sound: 'sand', gravity: true });
+  def(B.GRAVEL, { name: 'Gravel', tex: { all: 'gravel' }, hard: 0.6, tool: 'shovel', sound: 'gravel', gravity: true,
     drops: function (meta, rng) { return [{ id: rng() < 0.1 ? IT.FLINT : B.GRAVEL, n: 1 }]; } });
-  def(B.ORE_GOLD, { name: '金矿石', tex: { all: 'ore_gold' }, hard: 3, tool: 'pick', tier: 2, needTool: true, resist: 6 });
-  def(B.ORE_IRON, { name: '铁矿石', tex: { all: 'ore_iron' }, hard: 3, tool: 'pick', tier: 1, needTool: true, resist: 6 });
-  def(B.ORE_COAL, { name: '煤矿石', tex: { all: 'ore_coal' }, hard: 3, tool: 'pick', needTool: true, resist: 6,
+  def(B.ORE_GOLD, { name: 'Gold Ore', tex: { all: 'ore_gold' }, hard: 3, tool: 'pick', tier: 2, needTool: true, resist: 6 });
+  def(B.ORE_IRON, { name: 'Iron Ore', tex: { all: 'ore_iron' }, hard: 3, tool: 'pick', tier: 1, needTool: true, resist: 6 });
+  def(B.ORE_COAL, { name: 'Coal Ore', tex: { all: 'ore_coal' }, hard: 3, tool: 'pick', needTool: true, resist: 6,
     drops: function () { return [{ id: IT.COAL, n: 1 }]; } });
-  def(B.LOG_OAK, { name: '橡木原木', tex: { top: 'log_oak_top', bottom: 'log_oak_top', side: 'log_oak' },
+  def(B.LOG_OAK, { name: 'Oak Log', tex: { top: 'log_oak_top', bottom: 'log_oak_top', side: 'log_oak' },
     hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
-  def(B.LEAVES_OAK, { name: '橡树树叶', tex: { all: 'leaves_oak' }, opaque: false, opacity: 1, hard: 0.2,
+  def(B.LEAVES_OAK, { name: 'Oak Leaves', tex: { all: 'leaves_oak' }, opaque: false, opacity: 1, hard: 0.2,
     sound: 'grass', tint: 1, cutout: true, resist: 0.2,
     drops: function (meta, rng) {
       var r = rng();
@@ -97,62 +97,62 @@ var Blocks = (function () {
       if (r < 0.055) return [{ id: IT.APPLE, n: 1 }];
       return [];
     } });
-  def(B.GLASS, { name: '玻璃', tex: { all: 'glass' }, opaque: false, opacity: 0, hard: 0.3, sound: 'glass',
+  def(B.GLASS, { name: 'Glass', tex: { all: 'glass' }, opaque: false, opacity: 0, hard: 0.3, sound: 'glass',
     cutout: true, drops: function () { return []; } });
-  def(B.SANDSTONE, { name: '砂岩', tex: { top: 'sandstone_top', bottom: 'sandstone_bottom', side: 'sandstone' },
+  def(B.SANDSTONE, { name: 'Sandstone', tex: { top: 'sandstone_top', bottom: 'sandstone_bottom', side: 'sandstone' },
     hard: 0.8, tool: 'pick', needTool: true });
-  def(B.LOG_BIRCH, { name: '白桦原木', tex: { top: 'log_birch_top', bottom: 'log_birch_top', side: 'log_birch' },
+  def(B.LOG_BIRCH, { name: 'Birch Log', tex: { top: 'log_birch_top', bottom: 'log_birch_top', side: 'log_birch' },
     hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
-  def(B.LEAVES_BIRCH, { name: '白桦树叶', tex: { all: 'leaves_birch' }, opaque: false, opacity: 1, hard: 0.2,
+  def(B.LEAVES_BIRCH, { name: 'Birch Leaves', tex: { all: 'leaves_birch' }, opaque: false, opacity: 1, hard: 0.2,
     sound: 'grass', tint: 1, cutout: true, resist: 0.2,
     drops: function (meta, rng) { return rng() < 0.05 ? [{ id: B.SAPLING_BIRCH, n: 1 }] : []; } });
-  def(B.PLANKS_BIRCH, { name: '白桦木板', tex: { all: 'planks_birch' }, hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
-  def(B.LOG_SPRUCE, { name: '云杉原木', tex: { top: 'log_spruce_top', bottom: 'log_spruce_top', side: 'log_spruce' },
+  def(B.PLANKS_BIRCH, { name: 'Birch Planks', tex: { all: 'planks_birch' }, hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
+  def(B.LOG_SPRUCE, { name: 'Spruce Log', tex: { top: 'log_spruce_top', bottom: 'log_spruce_top', side: 'log_spruce' },
     hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
-  def(B.LEAVES_SPRUCE, { name: '云杉树叶', tex: { all: 'leaves_spruce' }, opaque: false, opacity: 1, hard: 0.2,
+  def(B.LEAVES_SPRUCE, { name: 'Spruce Leaves', tex: { all: 'leaves_spruce' }, opaque: false, opacity: 1, hard: 0.2,
     sound: 'grass', tint: 1, cutout: true, resist: 0.2,
     drops: function (meta, rng) { return rng() < 0.05 ? [{ id: B.SAPLING_SPRUCE, n: 1 }] : []; } });
-  def(B.PLANKS_SPRUCE, { name: '云杉木板', tex: { all: 'planks_spruce' }, hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
-  def(B.WOOL, { name: '羊毛', tex: { all: 'wool' }, hard: 0.8, sound: 'cloth' });
-  def(B.DANDELION, { name: '蒲公英', tex: { all: 'dandelion' }, solid: false, opaque: false, opacity: 0, hard: 0,
+  def(B.PLANKS_SPRUCE, { name: 'Spruce Planks', tex: { all: 'planks_spruce' }, hard: 2, tool: 'axe', sound: 'wood', resist: 3 });
+  def(B.WOOL, { name: 'Wool', tex: { all: 'wool' }, hard: 0.8, sound: 'cloth' });
+  def(B.DANDELION, { name: 'Dandelion', tex: { all: 'dandelion' }, solid: false, opaque: false, opacity: 0, hard: 0,
     render: 'cross', sound: 'grass', cutout: true });
-  def(B.POPPY, { name: '虞美人', tex: { all: 'poppy' }, solid: false, opaque: false, opacity: 0, hard: 0,
+  def(B.POPPY, { name: 'Poppy', tex: { all: 'poppy' }, solid: false, opaque: false, opacity: 0, hard: 0,
     render: 'cross', sound: 'grass', cutout: true });
-  def(B.MUSHROOM_BROWN, { name: '棕色蘑菇', tex: { all: 'mushroom_brown' }, solid: false, opaque: false, opacity: 0,
+  def(B.MUSHROOM_BROWN, { name: 'Brown Mushroom', tex: { all: 'mushroom_brown' }, solid: false, opaque: false, opacity: 0,
     hard: 0, render: 'cross', sound: 'grass', cutout: true });
-  def(B.MUSHROOM_RED, { name: '红色蘑菇', tex: { all: 'mushroom_red' }, solid: false, opaque: false, opacity: 0,
+  def(B.MUSHROOM_RED, { name: 'Red Mushroom', tex: { all: 'mushroom_red' }, solid: false, opaque: false, opacity: 0,
     hard: 0, render: 'cross', sound: 'grass', cutout: true });
-  def(B.BLOCK_GOLD, { name: '金块', tex: { all: 'block_gold' }, hard: 3, tool: 'pick', tier: 2, needTool: true, resist: 6 });
-  def(B.BLOCK_IRON, { name: '铁块', tex: { all: 'block_iron' }, hard: 5, tool: 'pick', tier: 1, needTool: true, resist: 6 });
-  def(B.BLOCK_DIAMOND, { name: '钻石块', tex: { all: 'block_diamond' }, hard: 5, tool: 'pick', tier: 2, needTool: true, resist: 6 });
+  def(B.BLOCK_GOLD, { name: 'Gold Block', tex: { all: 'block_gold' }, hard: 3, tool: 'pick', tier: 2, needTool: true, resist: 6 });
+  def(B.BLOCK_IRON, { name: 'Iron Block', tex: { all: 'block_iron' }, hard: 5, tool: 'pick', tier: 1, needTool: true, resist: 6 });
+  def(B.BLOCK_DIAMOND, { name: 'Diamond Block', tex: { all: 'block_diamond' }, hard: 5, tool: 'pick', tier: 2, needTool: true, resist: 6 });
   def(B.TNT, { name: 'TNT', tex: { top: 'tnt_top', bottom: 'tnt_bottom', side: 'tnt_side' }, hard: 0,
     sound: 'grass', resist: 0 });
-  def(B.OBSIDIAN, { name: '黑曜石', tex: { all: 'obsidian' }, hard: 50, tool: 'pick', tier: 3, needTool: true, resist: 99999 });
-  def(B.TORCH, { name: '火把', tex: { all: 'torch' }, solid: false, opaque: false, opacity: 0, hard: 0,
+  def(B.OBSIDIAN, { name: 'Obsidian', tex: { all: 'obsidian' }, hard: 50, tool: 'pick', tier: 3, needTool: true, resist: 99999 });
+  def(B.TORCH, { name: 'Torch', tex: { all: 'torch' }, solid: false, opaque: false, opacity: 0, hard: 0,
     render: 'torch', sound: 'wood', light: 14, cutout: true });
-  def(B.CHEST, { name: '箱子', tex: { top: 'chest_top', bottom: 'chest_top', side: 'chest_side', front: 'chest_front' },
+  def(B.CHEST, { name: 'Chest', tex: { top: 'chest_top', bottom: 'chest_top', side: 'chest_side', front: 'chest_front' },
     hard: 2.5, tool: 'axe', sound: 'wood', facing: true, resist: 3 });
-  def(B.ORE_DIAMOND, { name: '钻石矿石', tex: { all: 'ore_diamond' }, hard: 3, tool: 'pick', tier: 2, needTool: true, resist: 6,
+  def(B.ORE_DIAMOND, { name: 'Diamond Ore', tex: { all: 'ore_diamond' }, hard: 3, tool: 'pick', tier: 2, needTool: true, resist: 6,
     drops: function () { return [{ id: IT.DIAMOND, n: 1 }]; } });
-  def(B.CRAFTING_TABLE, { name: '工作台', tex: { top: 'table_top', bottom: 'planks_oak', side: 'table_side', front: 'table_front' },
+  def(B.CRAFTING_TABLE, { name: 'Crafting Table', tex: { top: 'table_top', bottom: 'planks_oak', side: 'table_side', front: 'table_front' },
     hard: 2.5, tool: 'axe', sound: 'wood', resist: 3 });
-  def(B.FARMLAND, { name: '耕地', tex: { top: 'farmland', bottom: 'dirt', side: 'dirt' }, hard: 0.6,
+  def(B.FARMLAND, { name: 'Farmland', tex: { top: 'farmland', bottom: 'dirt', side: 'dirt' }, hard: 0.6,
     tool: 'shovel', sound: 'gravel', drops: function () { return [{ id: B.DIRT, n: 1 }]; } });
-  def(B.FURNACE, { name: '熔炉', tex: { top: 'furnace_top', bottom: 'furnace_top', side: 'furnace_side', front: 'furnace_front' },
+  def(B.FURNACE, { name: 'Furnace', tex: { top: 'furnace_top', bottom: 'furnace_top', side: 'furnace_side', front: 'furnace_front' },
     hard: 3.5, tool: 'pick', needTool: true, facing: true, resist: 6 });
-  def(B.LADDER, { name: '梯子', tex: { all: 'ladder' }, solid: false, opaque: false, opacity: 0, hard: 0.4,
+  def(B.LADDER, { name: 'Ladder', tex: { all: 'ladder' }, solid: false, opaque: false, opacity: 0, hard: 0.4,
     render: 'ladder', sound: 'wood', climb: true, cutout: true });
-  def(B.SNOW_LAYER, { name: '雪', tex: { all: 'snow' }, opaque: false, opacity: 0, hard: 0.1, tool: 'shovel',
+  def(B.SNOW_LAYER, { name: 'Snow', tex: { all: 'snow' }, opaque: false, opacity: 0, hard: 0.1, tool: 'shovel',
     sound: 'snow', render: 'snow', box: [0, 0, 0, 1, 0.125, 1], replaceable: true,
     drops: function () { return [{ id: IT.SNOWBALL, n: 1 }]; } });
-  def(B.ICE, { name: '冰', tex: { all: 'ice' }, opaque: false, opacity: 2, hard: 0.5, tool: 'pick',
+  def(B.ICE, { name: 'Ice', tex: { all: 'ice' }, opaque: false, opacity: 2, hard: 0.5, tool: 'pick',
     sound: 'glass', transp: true, drops: function () { return []; } });
-  def(B.SNOW_BLOCK, { name: '雪块', tex: { all: 'snow' }, hard: 0.2, tool: 'shovel', sound: 'snow',
+  def(B.SNOW_BLOCK, { name: 'Snow Block', tex: { all: 'snow' }, hard: 0.2, tool: 'shovel', sound: 'snow',
     drops: function () { return [{ id: IT.SNOWBALL, n: 4 }]; } });
-  def(B.CACTUS, { name: '仙人掌', tex: { top: 'cactus_top', bottom: 'cactus_top', side: 'cactus_side' },
+  def(B.CACTUS, { name: 'Cactus', tex: { top: 'cactus_top', bottom: 'cactus_top', side: 'cactus_side' },
     opaque: false, opacity: 0, hard: 0.4, sound: 'cloth', render: 'cactus' });
-  def(B.STONE_BRICKS, { name: '石砖', tex: { all: 'stone_bricks' }, hard: 1.5, tool: 'pick', needTool: true, resist: 6 });
-  def(B.WHEAT, { name: '小麦', tex: { all: 'wheat_0' }, solid: false, opaque: false, opacity: 0, hard: 0,
+  def(B.STONE_BRICKS, { name: 'Stone Bricks', tex: { all: 'stone_bricks' }, hard: 1.5, tool: 'pick', needTool: true, resist: 6 });
+  def(B.WHEAT, { name: 'Wheat', tex: { all: 'wheat_0' }, solid: false, opaque: false, opacity: 0, hard: 0,
     render: 'crop', sound: 'grass', cutout: true,
     drops: function (meta, rng) {
       if (meta >= 7) {
@@ -162,29 +162,29 @@ var Blocks = (function () {
       }
       return [{ id: IT.SEEDS, n: 1 }];
     } });
-  def(B.TALL_GRASS, { name: '草', tex: { all: 'tall_grass' }, solid: false, opaque: false, opacity: 0, hard: 0,
+  def(B.TALL_GRASS, { name: 'Grass', tex: { all: 'tall_grass' }, solid: false, opaque: false, opacity: 0, hard: 0,
     render: 'cross', sound: 'grass', tint: 1, cutout: true, replaceable: true,
     drops: function (meta, rng) { return rng() < 0.25 ? [{ id: IT.SEEDS, n: 1 }] : []; } });
-  def(B.DEAD_BUSH, { name: '枯萎的灌木', tex: { all: 'dead_bush' }, solid: false, opaque: false, opacity: 0, hard: 0,
+  def(B.DEAD_BUSH, { name: 'Dead Bush', tex: { all: 'dead_bush' }, solid: false, opaque: false, opacity: 0, hard: 0,
     render: 'cross', sound: 'grass', cutout: true, replaceable: true,
     drops: function (meta, rng) { var n = (rng() * 3) | 0; return n ? [{ id: IT.STICK, n: n }] : []; } });
-  def(B.PUMPKIN, { name: '南瓜', tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_face' },
+  def(B.PUMPKIN, { name: 'Pumpkin', tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_face' },
     hard: 1, tool: 'axe', sound: 'wood', facing: true });
-  def(B.JACK_O_LANTERN, { name: '南瓜灯', tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_lit' },
+  def(B.JACK_O_LANTERN, { name: 'Jack o\'Lantern', tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_lit' },
     hard: 1, tool: 'axe', sound: 'wood', light: 15, facing: true });
-  def(B.SNOWY_GRASS, { name: '积雪的草方块', tex: { top: 'snow', bottom: 'dirt', side: 'grass_side_snow' },
+  def(B.SNOWY_GRASS, { name: 'Snowy Grass Block', tex: { top: 'snow', bottom: 'dirt', side: 'grass_side_snow' },
     hard: 0.6, tool: 'shovel', sound: 'grass',
     drops: function () { return [{ id: B.DIRT, n: 1 }]; } });
-  def(B.SAPLING_BIRCH, { name: '白桦树苗', tex: { all: 'sapling_birch' }, solid: false, opaque: false, opacity: 0,
+  def(B.SAPLING_BIRCH, { name: 'Birch Sapling', tex: { all: 'sapling_birch' }, solid: false, opaque: false, opacity: 0,
     hard: 0, render: 'cross', sound: 'grass', cutout: true });
-  def(B.SAPLING_SPRUCE, { name: '云杉树苗', tex: { all: 'sapling_spruce' }, solid: false, opaque: false, opacity: 0,
+  def(B.SAPLING_SPRUCE, { name: 'Spruce Sapling', tex: { all: 'sapling_spruce' }, solid: false, opaque: false, opacity: 0,
     hard: 0, render: 'cross', sound: 'grass', cutout: true });
-  def(B.MOSSY_COBBLE, { name: '苔石圆石', tex: { all: 'mossy_cobble' }, hard: 2, tool: 'pick', needTool: true, resist: 6 });
-  def(B.FURNACE_LIT, { name: '熔炉', tex: { top: 'furnace_top', bottom: 'furnace_top', side: 'furnace_side', front: 'furnace_lit' },
+  def(B.MOSSY_COBBLE, { name: 'Mossy Cobblestone', tex: { all: 'mossy_cobble' }, hard: 2, tool: 'pick', needTool: true, resist: 6 });
+  def(B.FURNACE_LIT, { name: 'Furnace', tex: { top: 'furnace_top', bottom: 'furnace_top', side: 'furnace_side', front: 'furnace_lit' },
     hard: 3.5, tool: 'pick', needTool: true, facing: true, light: 13, resist: 6,
     drops: function () { return [{ id: B.FURNACE, n: 1 }]; } });
 
-  // ---------- 工具 ----------
+  // ---------- tools ----------
   var TOOL_MATS = {
     wood:    { tier: 0, speed: 2,  dur: 60,   swordDmg: 4, axeDmg: 3 },
     stone:   { tier: 1, speed: 4,  dur: 132,  swordDmg: 5, axeDmg: 4 },
@@ -192,44 +192,44 @@ var Blocks = (function () {
     gold:    { tier: 0, speed: 12, dur: 33,   swordDmg: 4, axeDmg: 3 },
     diamond: { tier: 3, speed: 8,  dur: 1562, swordDmg: 7, axeDmg: 6 }
   };
-  var MAT_NAMES = { wood: '木', stone: '石', iron: '铁', gold: '金', diamond: '钻石' };
+  var MAT_NAMES = { wood: 'Wooden', stone: 'Stone', iron: 'Iron', gold: 'Golden', diamond: 'Diamond' };
   var TOOL_KINDS = [
-    { key: 'PICK', type: 'pick', name: '镐', dmg: 2 },
-    { key: 'AXE', type: 'axe', name: '斧', dmg: 0 },     // dmg 用 axeDmg
-    { key: 'SHOVEL', type: 'shovel', name: '锹', dmg: 2 },
-    { key: 'HOE', type: 'hoe', name: '锄', dmg: 1 },
-    { key: 'SWORD', type: 'sword', name: '剑', dmg: 0 }  // dmg 用 swordDmg
+    { key: 'PICK', type: 'pick', name: 'Pickaxe', dmg: 2 },
+    { key: 'AXE', type: 'axe', name: 'Axe', dmg: 0 },     // dmg uses axeDmg
+    { key: 'SHOVEL', type: 'shovel', name: 'Shovel', dmg: 2 },
+    { key: 'HOE', type: 'hoe', name: 'Hoe', dmg: 1 },
+    { key: 'SWORD', type: 'sword', name: 'Sword', dmg: 0 }  // dmg uses swordDmg
   ];
 
-  // ---------- 物品规格 ----------
+  // ---------- item specs ----------
   var ITEMS = {};
   function defItem(id, spec) { spec.id = id; ITEMS[id] = spec; }
-  defItem(IT.STICK, { name: '木棍', tile: 'item_stick', fuel: 100 });
-  defItem(IT.COAL, { name: '煤炭', tile: 'item_coal', fuel: 1600 });
-  defItem(IT.CHARCOAL, { name: '木炭', tile: 'item_charcoal', fuel: 1600 });
-  defItem(IT.IRON_INGOT, { name: '铁锭', tile: 'item_iron_ingot' });
-  defItem(IT.GOLD_INGOT, { name: '金锭', tile: 'item_gold_ingot' });
-  defItem(IT.DIAMOND, { name: '钻石', tile: 'item_diamond' });
-  defItem(IT.FLINT, { name: '燧石', tile: 'item_flint' });
-  defItem(IT.SEEDS, { name: '小麦种子', tile: 'item_seeds', plant: B.WHEAT });
-  defItem(IT.WHEAT, { name: '小麦', tile: 'item_wheat' });
-  defItem(IT.BREAD, { name: '面包', tile: 'item_bread', food: { pts: 5, sat: 6 } });
-  defItem(IT.APPLE, { name: '苹果', tile: 'item_apple', food: { pts: 4, sat: 2.4 } });
-  defItem(IT.PORK_RAW, { name: '生猪排', tile: 'item_pork_raw', food: { pts: 3, sat: 1.8 } });
-  defItem(IT.PORK_COOKED, { name: '熟猪排', tile: 'item_pork_cooked', food: { pts: 8, sat: 12.8 } });
-  defItem(IT.BEEF_RAW, { name: '生牛肉', tile: 'item_beef_raw', food: { pts: 3, sat: 1.8 } });
-  defItem(IT.BEEF_COOKED, { name: '牛排', tile: 'item_beef_cooked', food: { pts: 8, sat: 12.8 } });
-  defItem(IT.MUTTON_RAW, { name: '生羊肉', tile: 'item_mutton_raw', food: { pts: 2, sat: 1.2 } });
-  defItem(IT.MUTTON_COOKED, { name: '熟羊肉', tile: 'item_mutton_cooked', food: { pts: 6, sat: 9.6 } });
-  defItem(IT.ROTTEN_FLESH, { name: '腐肉', tile: 'item_rotten_flesh', food: { pts: 4, sat: 0.8, bad: 0.8 } });
-  defItem(IT.GUNPOWDER, { name: '火药', tile: 'item_gunpowder' });
-  defItem(IT.LEATHER, { name: '皮革', tile: 'item_leather' });
-  defItem(IT.SNOWBALL, { name: '雪球', tile: 'item_snowball', stack: 16 });
-  defItem(IT.BUCKET, { name: '铁桶', tile: 'item_bucket', stack: 1 });
-  defItem(IT.BUCKET_WATER, { name: '水桶', tile: 'item_bucket_water', stack: 1 });
-  defItem(IT.BUCKET_LAVA, { name: '岩浆桶', tile: 'item_bucket_lava', stack: 1, fuel: 20000, fuelLeft: IT.BUCKET });
-  defItem(IT.FLINT_STEEL, { name: '打火石', tile: 'item_flint_steel', stack: 1, tool: { type: 'igniter', tier: 0, speed: 1, dur: 64, dmg: 1 } });
-  // 生成 5x5 工具
+  defItem(IT.STICK, { name: 'Stick', tile: 'item_stick', fuel: 100 });
+  defItem(IT.COAL, { name: 'Coal', tile: 'item_coal', fuel: 1600 });
+  defItem(IT.CHARCOAL, { name: 'Charcoal', tile: 'item_charcoal', fuel: 1600 });
+  defItem(IT.IRON_INGOT, { name: 'Iron Ingot', tile: 'item_iron_ingot' });
+  defItem(IT.GOLD_INGOT, { name: 'Gold Ingot', tile: 'item_gold_ingot' });
+  defItem(IT.DIAMOND, { name: 'Diamond', tile: 'item_diamond' });
+  defItem(IT.FLINT, { name: 'Flint', tile: 'item_flint' });
+  defItem(IT.SEEDS, { name: 'Wheat Seeds', tile: 'item_seeds', plant: B.WHEAT });
+  defItem(IT.WHEAT, { name: 'Wheat', tile: 'item_wheat' });
+  defItem(IT.BREAD, { name: 'Bread', tile: 'item_bread', food: { pts: 5, sat: 6 } });
+  defItem(IT.APPLE, { name: 'Apple', tile: 'item_apple', food: { pts: 4, sat: 2.4 } });
+  defItem(IT.PORK_RAW, { name: 'Raw Porkchop', tile: 'item_pork_raw', food: { pts: 3, sat: 1.8 } });
+  defItem(IT.PORK_COOKED, { name: 'Cooked Porkchop', tile: 'item_pork_cooked', food: { pts: 8, sat: 12.8 } });
+  defItem(IT.BEEF_RAW, { name: 'Raw Beef', tile: 'item_beef_raw', food: { pts: 3, sat: 1.8 } });
+  defItem(IT.BEEF_COOKED, { name: 'Steak', tile: 'item_beef_cooked', food: { pts: 8, sat: 12.8 } });
+  defItem(IT.MUTTON_RAW, { name: 'Raw Mutton', tile: 'item_mutton_raw', food: { pts: 2, sat: 1.2 } });
+  defItem(IT.MUTTON_COOKED, { name: 'Cooked Mutton', tile: 'item_mutton_cooked', food: { pts: 6, sat: 9.6 } });
+  defItem(IT.ROTTEN_FLESH, { name: 'Rotten Flesh', tile: 'item_rotten_flesh', food: { pts: 4, sat: 0.8, bad: 0.8 } });
+  defItem(IT.GUNPOWDER, { name: 'Gunpowder', tile: 'item_gunpowder' });
+  defItem(IT.LEATHER, { name: 'Leather', tile: 'item_leather' });
+  defItem(IT.SNOWBALL, { name: 'Snowball', tile: 'item_snowball', stack: 16 });
+  defItem(IT.BUCKET, { name: 'Bucket', tile: 'item_bucket', stack: 1 });
+  defItem(IT.BUCKET_WATER, { name: 'Water Bucket', tile: 'item_bucket_water', stack: 1 });
+  defItem(IT.BUCKET_LAVA, { name: 'Lava Bucket', tile: 'item_bucket_lava', stack: 1, fuel: 20000, fuelLeft: IT.BUCKET });
+  defItem(IT.FLINT_STEEL, { name: 'Flint and Steel', tile: 'item_flint_steel', stack: 1, tool: { type: 'igniter', tier: 0, speed: 1, dur: 64, dmg: 1 } });
+  // generate the 5x5 tool grid
   var matKeys = ['wood', 'stone', 'iron', 'gold', 'diamond'];
   for (var mi = 0; mi < matKeys.length; mi++) {
     var mk = matKeys[mi], mat = TOOL_MATS[mk];
@@ -238,13 +238,13 @@ var Blocks = (function () {
       var id = IT[kind.key + '_' + mk.toUpperCase()];
       var dmg = kind.type === 'sword' ? mat.swordDmg : (kind.type === 'axe' ? mat.axeDmg : kind.dmg);
       defItem(id, {
-        name: MAT_NAMES[mk] + kind.name, tile: 'tool_' + kind.type + '_' + mk, stack: 1,
+        name: MAT_NAMES[mk] + ' ' + kind.name, tile: 'tool_' + kind.type + '_' + mk, stack: 1,
         tool: { type: kind.type, tier: mat.tier, speed: mat.speed, dur: mat.dur, dmg: dmg, fuel: mk === 'wood' ? 200 : 0 }
       });
     }
   }
 
-  // ---------- 通用查询 ----------
+  // ---------- generic lookups ----------
   function isBlockItem(id) { return id > 0 && id < 100; }
   function name(id) {
     if (isBlockItem(id)) return BLOCKS[id] ? BLOCKS[id].name : '?';
@@ -272,8 +272,8 @@ var Blocks = (function () {
     return 0;
   }
 
-  // ---------- 合成配方 ----------
-  var PL = [B.PLANKS_OAK, B.PLANKS_BIRCH, B.PLANKS_SPRUCE]; // 任意木板
+  // ---------- crafting recipes ----------
+  var PL = [B.PLANKS_OAK, B.PLANKS_BIRCH, B.PLANKS_SPRUCE]; // any planks
   var COALS = [IT.COAL, IT.CHARCOAL];
   var S = IT.STICK, C = B.COBBLE;
   var RECIPES = [];
@@ -296,9 +296,9 @@ var Blocks = (function () {
   shaped([[B.STONE, B.STONE], [B.STONE, B.STONE]], B.STONE_BRICKS, 4);
   shaped([[B.PUMPKIN], [B.TORCH]], B.JACK_O_LANTERN, 1);
   shaped([[IT.SNOWBALL, IT.SNOWBALL], [IT.SNOWBALL, IT.SNOWBALL]], B.SNOW_BLOCK, 1);
-  shaped([[B.WOOL, B.WOOL], [B.WOOL, B.WOOL]], B.WOOL, 4); // 占位无意义? 移除
+  shaped([[B.WOOL, B.WOOL], [B.WOOL, B.WOOL]], B.WOOL, 4); // placeholder/meaningless? removed
   RECIPES.pop();
-  // 储物块
+  // storage blocks
   var nine = function (m) { return [[m, m, m], [m, m, m], [m, m, m]]; };
   shaped(nine(IT.IRON_INGOT), B.BLOCK_IRON, 1);
   shaped(nine(IT.GOLD_INGOT), B.BLOCK_GOLD, 1);
@@ -306,7 +306,7 @@ var Blocks = (function () {
   shapeless([B.BLOCK_IRON], IT.IRON_INGOT, 9);
   shapeless([B.BLOCK_GOLD], IT.GOLD_INGOT, 9);
   shapeless([B.BLOCK_DIAMOND], IT.DIAMOND, 9);
-  // 工具配方
+  // tool recipes
   var TOOL_MAT_ITEM = { wood: PL, stone: C, iron: IT.IRON_INGOT, gold: IT.GOLD_INGOT, diamond: IT.DIAMOND };
   for (mi = 0; mi < matKeys.length; mi++) {
     var mk2 = matKeys[mi], T = TOOL_MAT_ITEM[mk2], U = mk2.toUpperCase();
@@ -317,7 +317,7 @@ var Blocks = (function () {
     shaped([[T], [T], [S]], IT['SWORD_' + U], 1);
   }
 
-  // ---------- 熔炼 ----------
+  // ---------- smelting ----------
   var SMELT = {};
   SMELT[B.COBBLE] = { id: B.STONE, n: 1 };
   SMELT[B.SAND] = { id: B.GLASS, n: 1 };
@@ -331,7 +331,7 @@ var Blocks = (function () {
   SMELT[IT.MUTTON_RAW] = { id: IT.MUTTON_COOKED, n: 1 };
   SMELT[B.MOSSY_COBBLE] = { id: B.STONE, n: 1 };
 
-  // ---------- 创造模式物品栏 ----------
+  // ---------- creative inventory ----------
   var CREATIVE = [
     B.STONE, B.COBBLE, B.MOSSY_COBBLE, B.STONE_BRICKS, B.DIRT, B.GRASS, B.SAND, B.SANDSTONE, B.GRAVEL,
     B.LOG_OAK, B.PLANKS_OAK, B.LOG_BIRCH, B.PLANKS_BIRCH, B.LOG_SPRUCE, B.PLANKS_SPRUCE,

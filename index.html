@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>MineJS — 我的世界 网页版</title>
+<title>MineJS — Minecraft in the Browser</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
@@ -51,7 +51,7 @@
   #f3 { position: absolute; top: 6px; left: 6px; font: 13px/1.5 monospace; white-space: pre;
     background: rgba(0,0,0,0.4); padding: 6px 10px; display: none; z-index: 6; pointer-events: none; }
 
-  /* ---------- 窗口 ---------- */
+  /* ---------- windows ---------- */
   #winroot { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.55); z-index: 10; }
   .window { background: #c6c6c6; border: 3px solid; border-color: #fff #555 #555 #fff;
@@ -81,7 +81,7 @@
   #tooltip { position: fixed; display: none; background: rgba(16,0,16,0.92); border: 2px solid #25015a;
     padding: 4px 8px; font-size: 14px; color: #fff; z-index: 22; pointer-events: none; border-radius: 3px; }
 
-  /* ---------- 提示 toast ---------- */
+  /* ---------- toast notifications ---------- */
   #toasts { position: absolute; top: 10px; right: 10px; z-index: 15; display: flex; flex-direction: column; gap: 8px; }
   .toast { display: flex; align-items: center; gap: 10px; background: #212121; border: 2px solid;
     border-color: #555 #1a1a1a #1a1a1a #555; padding: 8px 14px; transform: translateX(120%); transition: transform 0.4s; min-width: 220px; }
@@ -90,7 +90,7 @@
   .toast-title { color: #ff5; font-size: 14px; font-weight: bold; }
   .toast-sub { color: #ccc; font-size: 12px; }
 
-  /* ---------- 全屏界面 ---------- */
+  /* ---------- fullscreen screens ---------- */
   .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 14px; z-index: 30;
     background: linear-gradient(rgba(16,12,8,0.92), rgba(24,20,14,0.94)),
@@ -153,66 +153,66 @@
 <div id="cursor-item"></div>
 <div id="tooltip"></div>
 
-<div id="lock-hint" class="screen" style="display:none"><div class="hint-box">点击继续游戏</div></div>
+<div id="lock-hint" class="screen" style="display:none"><div class="hint-box">Click to continue playing</div></div>
 
 <div id="title-screen" class="screen" style="display:none">
   <h1 class="logo">MineJS</h1>
-  <div class="subtitle">我的世界 · 网页复刻版</div>
+  <div class="subtitle">Minecraft · Browser Remake</div>
   <div id="world-list"></div>
-  <button id="btn-new-world" class="mc-btn">创建新世界</button>
+  <button id="btn-new-world" class="mc-btn">Create New World</button>
   <div class="controls-hint">
-    WASD 移动 · 空格 跳跃 · Shift 潜行 · 双击W 疾跑 · 左键 挖掘/攻击 · 右键 放置/使用<br>
-    E 物品栏 · Q 丢弃 · 滚轮/数字键 切换物品 · F3 调试 · F5 第三人称 · Esc 暂停
+    WASD Move · Space Jump · Shift Sneak · Double-tap W Sprint · Left-click Mine/Attack · Right-click Place/Use<br>
+    E Inventory · Q Drop · Scroll/Number keys Switch item · F3 Debug · F5 Third-person · Esc Pause
   </div>
 </div>
 
 <div id="create-screen" class="screen" style="display:none">
-  <h2>创建新世界</h2>
-  <label>世界名称<input id="world-name" placeholder="新的世界" maxlength="24"></label>
-  <label>种子 (留空随机)<input id="world-seed" placeholder="随机"></label>
-  <label>游戏模式
+  <h2>Create New World</h2>
+  <label>World Name<input id="world-name" placeholder="New World" maxlength="24"></label>
+  <label>Seed (leave blank for random)<input id="world-seed" placeholder="Random"></label>
+  <label>Game Mode
     <select id="world-mode">
-      <option value="survival">生存模式</option>
-      <option value="creative">创造模式</option>
+      <option value="survival">Survival Mode</option>
+      <option value="creative">Creative Mode</option>
     </select>
   </label>
-  <button id="btn-create-go" class="mc-btn">创建世界</button>
-  <button id="btn-create-back" class="mc-btn">返回</button>
+  <button id="btn-create-go" class="mc-btn">Create World</button>
+  <button id="btn-create-back" class="mc-btn">Back</button>
 </div>
 
 <div id="pause-screen" class="screen overlay" style="display:none">
-  <h2>游戏暂停</h2>
-  <button id="btn-resume" class="mc-btn">回到游戏</button>
-  <button id="btn-options" class="mc-btn">选项...</button>
-  <button id="btn-quit" class="mc-btn">保存并退出</button>
+  <h2>Game Paused</h2>
+  <button id="btn-resume" class="mc-btn">Back to Game</button>
+  <button id="btn-options" class="mc-btn">Options...</button>
+  <button id="btn-quit" class="mc-btn">Save and Quit</button>
 </div>
 
 <div id="options-screen" class="screen overlay" style="display:none">
-  <h2>选项</h2>
-  <div class="opt-row"><span>渲染距离</span><input type="range" id="opt-dist" min="3" max="10" step="1"><span id="opt-dist-val"></span></div>
-  <div class="opt-row"><span>视场角 FOV</span><input type="range" id="opt-fov" min="60" max="100" step="1"><span id="opt-fov-val"></span></div>
-  <div class="opt-row"><span>鼠标灵敏度</span><input type="range" id="opt-sens" min="0.2" max="3" step="0.1"><span id="opt-sens-val"></span></div>
-  <div class="opt-row"><span>音量</span><input type="range" id="opt-vol" min="0" max="1" step="0.05"><span id="opt-vol-val"></span></div>
-  <div class="opt-row"><span>音乐</span><input type="checkbox" id="opt-music" checked><span></span></div>
-  <button id="btn-options-back" class="mc-btn">完成</button>
+  <h2>Options</h2>
+  <div class="opt-row"><span>Render Distance</span><input type="range" id="opt-dist" min="3" max="10" step="1"><span id="opt-dist-val"></span></div>
+  <div class="opt-row"><span>FOV</span><input type="range" id="opt-fov" min="60" max="100" step="1"><span id="opt-fov-val"></span></div>
+  <div class="opt-row"><span>Mouse Sensitivity</span><input type="range" id="opt-sens" min="0.2" max="3" step="0.1"><span id="opt-sens-val"></span></div>
+  <div class="opt-row"><span>Volume</span><input type="range" id="opt-vol" min="0" max="1" step="0.05"><span id="opt-vol-val"></span></div>
+  <div class="opt-row"><span>Music</span><input type="checkbox" id="opt-music" checked><span></span></div>
+  <button id="btn-options-back" class="mc-btn">Done</button>
 </div>
 
 <div id="death-screen" class="screen overlay-red" style="display:none">
-  <h2>你死了!</h2>
+  <h2>You Died!</h2>
   <div id="death-cause"></div>
-  <button id="btn-respawn" class="mc-btn">重生</button>
-  <button id="btn-death-quit" class="mc-btn">退出到标题界面</button>
+  <button id="btn-respawn" class="mc-btn">Respawn</button>
+  <button id="btn-death-quit" class="mc-btn">Quit to Title</button>
 </div>
 
 <div id="loading-screen" class="screen" style="display:none">
-  <h2 id="loading-msg">加载中...</h2>
+  <h2 id="loading-msg">Loading...</h2>
   <div id="loading-bar"><div id="loading-fill"></div></div>
 </div>
 
 <div id="webgl-fail" class="screen" style="display:none">
-  <h2>需要 WebGL2 支持</h2>
+  <h2>WebGL2 Support Required</h2>
   <div id="webgl-fail-msg"></div>
-  <div>请使用最新版 Chrome / Edge / Safari / Firefox</div>
+  <div>Please use the latest Chrome / Edge / Safari / Firefox</div>
 </div>
 
 <script src="js/util.js"></script>

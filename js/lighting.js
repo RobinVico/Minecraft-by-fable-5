@@ -1,8 +1,8 @@
-// ============ lighting.js — 天光/方块光 洪泛传播引擎 ============
+// ============ lighting.js — skylight/block light flood-fill propagation engine ============
 'use strict';
 var Light = (function () {
-  var OPA = new Uint8Array(256);   // 不透明度
-  var EMIT = new Uint8Array(256);  // 发光等级
+  var OPA = new Uint8Array(256);   // opacity
+  var EMIT = new Uint8Array(256);  // emission level
   (function () {
     var BL = Blocks.BLOCKS;
     for (var id = 0; id < BL.length; id++) {
@@ -14,7 +14,7 @@ var Light = (function () {
 
   var DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
-  // 队列: 扁平数组 [x,y,z, x,y,z, ...]
+  // queue: flat array [x,y,z, x,y,z, ...]
   function makeQ() { return { a: [], i: 0 }; }
   function qPush(q, x, y, z) { q.a.push(x, y, z); }
   function qPush4(q, x, y, z, v) { q.a.push(x, y, z, v); }
@@ -22,7 +22,7 @@ var Light = (function () {
 
   var skyAdd = makeQ(), blkAdd = makeQ(), remQ = makeQ();
 
-  // ---------- 世界光照读写 (经由 world 的列) ----------
+  // ---------- world light read/write (via world's columns) ----------
   function getL(world, sky, x, y, z) {
     if (y >= 128) return sky ? 15 : 0;
     if (y < 0) return 0;
@@ -39,7 +39,7 @@ var Light = (function () {
     var idx = lx | (lz << 4) | (y << 8);
     (sky ? col.sky : col.blk)[idx] = v;
     col.dirtyMesh = true;
-    // 边界光照变化影响邻列平滑光照
+    // border light changes affect neighbor columns' smooth lighting
     if (lx === 0) markN(world, x - 1, z); else if (lx === 15) markN(world, x + 1, z);
     if (lz === 0) markN(world, x, z - 1); else if (lz === 15) markN(world, x, z + 1);
   }
@@ -52,7 +52,7 @@ var Light = (function () {
     return OPA[world.getBlock(x, y, z)];
   }
 
-  // ---------- 增加传播 ----------
+  // ---------- increment propagation ----------
   function drainAdd(world, q, sky) {
     var a = q.a;
     while (q.i < a.length) {
@@ -67,7 +67,7 @@ var Light = (function () {
         var opa = OPA[world.getBlock(nx, ny, nz)];
         if (opa >= 15) continue;
         var nl;
-        if (sky && d === 3 && L === 15 && opa === 0) nl = 15;   // 天光垂直向下不衰减
+        if (sky && d === 3 && L === 15 && opa === 0) nl = 15;   // skylight does not attenuate straight down
         else nl = L - Math.max(1, opa);
         if (nl > getL(world, sky, nx, ny, nz)) {
           setL(world, sky, nx, ny, nz, nl);
@@ -78,7 +78,7 @@ var Light = (function () {
     qReset(q);
   }
 
-  // ---------- 移除传播 ----------
+  // ---------- decrement propagation ----------
   function removeBFS(world, sky, x, y, z) {
     var old = getL(world, sky, x, y, z);
     if (old === 0) return;
@@ -98,7 +98,7 @@ var Light = (function () {
         if (t === 0) continue;
         if (t < cl || (sky && d === 3 && cl === 15 && t === 15)) {
           setL(world, sky, nx, ny, nz, 0);
-          // 自发光方块被波及 → 重新点亮
+          // light-emitting block affected → relight
           var em = sky ? 0 : EMIT[world.getBlock(nx, ny, nz)];
           if (em > 0) { setL(world, sky, nx, ny, nz, em); qPush(addQ, nx, ny, nz); }
           else qPush4(remQ, nx, ny, nz, t);
@@ -110,7 +110,7 @@ var Light = (function () {
     qReset(remQ);
   }
 
-  // ---------- 高度图 ----------
+  // ---------- height map ----------
   function recomputeHeight(world, col, lx, lz) {
     var h = 0;
     for (var y = 127; y >= 0; y--) {
@@ -120,13 +120,13 @@ var Light = (function () {
     return h;
   }
 
-  // ---------- 单方块变更 ----------
+  // ---------- single block change ----------
   function updateOnSet(world, x, y, z, oldId, newId) {
     var col = world.getColumnAt(x, z);
     if (!col) return;
     var lx = x & 15, lz = z & 15;
 
-    // ---- 方块光 ----
+    // ---- block light ----
     removeBFS(world, false, x, y, z);
     if (EMIT[newId] > 0) {
       setL(world, false, x, y, z, EMIT[newId]);
@@ -135,15 +135,15 @@ var Light = (function () {
     for (var d = 0; d < 6; d++) qPush(blkAdd, x + DIRS[d][0], y + DIRS[d][1], z + DIRS[d][2]);
     drainAdd(world, blkAdd, false);
 
-    // ---- 天光 ----
+    // ---- skylight ----
     removeBFS(world, true, x, y, z);
-    // 高度图
+    // height map
     var hIdx = lx | (lz << 4);
     var oldH = col.height[hIdx];
     if (OPA[newId] > 0 && y >= oldH) col.height[hIdx] = y + 1;
     else if (OPA[newId] === 0 && y === oldH - 1) recomputeHeight(world, col, lx, lz);
     var newH = col.height[hIdx];
-    // 露天 → 垂直注入 15
+    // open to sky → inject 15 vertically
     if (OPA[newId] === 0 && y >= newH) {
       var yy = y;
       while (yy >= newH && yy >= 0 && OPA[col.blocks[lx | (lz << 4) | (yy << 8)]] === 0) {
@@ -156,10 +156,10 @@ var Light = (function () {
     drainAdd(world, skyAdd, true);
   }
 
-  // ---------- 新列初始化 ----------
+  // ---------- new column initialization ----------
   function initColumn(world, col) {
     var blocks = col.blocks, sky = col.sky;
-    // 高度图 + 垂直天光
+    // height map + vertical skylight
     for (var lz = 0; lz < 16; lz++) {
       for (var lx = 0; lx < 16; lx++) {
         var h = 0;
@@ -171,7 +171,7 @@ var Light = (function () {
       }
     }
     var wx0 = col.cx * 16, wz0 = col.cz * 16;
-    // 侧向天光扩散候选: 高度低于邻格的"崖壁"段
+    // lateral skylight spread candidates: "cliff wall" segments lower than neighbors
     for (lz = 0; lz < 16; lz++) {
       for (lx = 0; lx < 16; lx++) {
         var h2 = col.height[lx | (lz << 4)];
@@ -183,7 +183,7 @@ var Light = (function () {
         for (var y2 = h2; y2 < hm; y2++) qPush(skyAdd, wx0 + lx, y2, wz0 + lz);
       }
     }
-    // 发光方块 (岩浆/火把等)
+    // light-emitting blocks (lava/torches etc.)
     for (var i = 0; i < 32768; i++) {
       var em = EMIT[blocks[i]];
       if (em > 0) {
@@ -195,7 +195,7 @@ var Light = (function () {
     drainAdd(world, blkAdd, false);
   }
 
-  // 与已生成邻列交换边界光
+  // exchange border light with already-generated neighbor columns
   function exchangeBorders(world, col) {
     var wx0 = col.cx * 16, wz0 = col.cz * 16;
     var sides = [
@@ -224,11 +224,11 @@ var Light = (function () {
     drainAdd(world, blkAdd, false);
   }
 
-  // ---------- 区域重算 (爆炸等批量修改) ----------
+  // ---------- region recompute (batch modifications like explosions) ----------
   function relightRegion(world, x0, y0, z0, x1, y1, z1) {
     y0 = Math.max(0, y0); y1 = Math.min(127, y1);
     var x, y, z;
-    // 清零
+    // zero out
     for (x = x0; x <= x1; x++) for (z = z0; z <= z1; z++) {
       var col = world.getColumnAt(x, z);
       if (!col) continue;
@@ -238,7 +238,7 @@ var Light = (function () {
       }
       col.dirtyMesh = true;
     }
-    // 高度图 + 垂直天光
+    // height map + vertical skylight
     for (x = x0; x <= x1; x++) for (z = z0; z <= z1; z++) {
       var col2 = world.getColumnAt(x, z);
       if (!col2) continue;
@@ -249,13 +249,13 @@ var Light = (function () {
           qPush(skyAdd, x, y, z);
         } else break;
       }
-      // 区域内发光体
+      // light emitters within the region
       for (y = y0; y <= y1; y++) {
         var em = EMIT[world.getBlock(x, y, z)];
         if (em > 0) { setL(world, false, x, y, z, em); qPush(blkAdd, x, y, z); }
       }
     }
-    // 边壳注入
+    // border shell injection
     for (x = x0 - 1; x <= x1 + 1; x++) for (z = z0 - 1; z <= z1 + 1; z++) {
       for (y = y0 - 1; y <= y1 + 1; y++) {
         if (x >= x0 && x <= x1 && z >= z0 && z <= z1 && y >= y0 && y <= y1) continue;

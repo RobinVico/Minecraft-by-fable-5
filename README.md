@@ -1,81 +1,83 @@
-# MineJS — 我的世界 · 网页复刻版
+**English** · [中文](README.zh-CN.md)
 
-零依赖、纯原生 WebGL2 的 Minecraft 复刻。所有贴图由代码程序化绘制，无任何外部资源。
+# MineJS — Minecraft in the Browser
 
-![MineJS 游戏截图](test/final.png)
+A zero-dependency, pure-WebGL2 Minecraft remake. Every texture is drawn procedurally in code — no external assets.
 
-## 怎么玩
+![MineJS screenshot](test/final.png)
 
-**双击 `index.html` 即可开始**（推荐 Chrome / Edge，Safari / Firefox 也可以）。
+## How to play
 
-无需安装任何东西、无需联网。如果浏览器对 file:// 有限制，也可以起个本地服务器：
+**Just double-click `index.html`** (Chrome / Edge recommended; Safari / Firefox also work).
+
+Nothing to install, no internet required. If your browser restricts `file://`, run a local server instead:
 
 ```bash
 cd Game
 python3 -m http.server 8000
-# 然后打开 http://localhost:8000
+# then open http://localhost:8000
 ```
 
-## 操作
+## Controls
 
-| 按键 | 功能 |
+| Key | Action |
 |---|---|
-| 鼠标 | 视角 |
-| W A S D | 移动 |
-| 空格 | 跳跃（水中上浮）|
-| Shift | 潜行（不会掉下边缘）|
-| 双击 W 或 Ctrl+W | 疾跑 |
-| 左键 | 挖掘 / 攻击 |
-| 右键 | 放置方块 / 使用（吃东西按住）|
-| E | 物品栏 |
-| Q | 丢弃手中物品（Ctrl+Q 丢整组）|
-| 1-9 / 滚轮 | 切换快捷栏 |
-| F3 | 调试信息 |
-| F5 或 V | 第三人称 |
-| Esc | 暂停 |
-| 创造模式双击空格 | 飞行（空格升 / Shift 降）|
+| Mouse | Look |
+| W A S D | Move |
+| Space | Jump (swim up in water) |
+| Shift | Sneak (won't fall off edges) |
+| Double-tap W or Ctrl+W | Sprint |
+| Left click | Break / attack |
+| Right click | Place block / use (hold to eat) |
+| E | Inventory |
+| Q | Drop held item (Ctrl+Q drops the whole stack) |
+| 1-9 / scroll | Select hotbar slot |
+| F3 | Debug info |
+| F5 or V | Third person |
+| Esc | Pause |
+| Double-tap Space (Creative) | Fly (Space up / Shift down) |
 
-## 已实现的内容
+## What's implemented
 
-**世界**：无限地形 · 9 种群系（平原/森林/桦木林/针叶林/雪原/沙漠/山地/海洋/沙滩）· 洞穴与峡谷 · 矿脉（煤/铁/金/钻石，按深度分布）· 三种树 · 花草南瓜仙人掌蘑菇 · 冻湖与积雪 · 基岩与地底岩浆 · 种子系统
+**World**: infinite terrain · 9 biomes (Plains / Forest / Birch Forest / Taiga / Snowy Tundra / Desert / Mountains / Ocean / Beach) · caves & ravines · ore veins (coal / iron / gold / diamond, distributed by depth) · three tree types · flowers, grass, pumpkins, cactus, mushrooms · frozen lakes & snow cover · bedrock & underground lava · seed system
 
-**光照**：阳光/方块光双通道洪泛传播 · 平滑光照与环境光遮蔽（AO）· 火把暖色光 · 昼夜循环（20分钟一天）· 日出日落天空渐变 · 星空 · 太阳月亮 · 云层
+**Lighting**: sky/block dual-channel flood-fill propagation · smooth lighting with ambient occlusion (AO) · warm torch light · day/night cycle (20 minutes per day) · sunrise/sunset sky gradients · starfield · sun & moon · clouds
 
-**生存**：生命/饥饿/饱和度/氧气 · 摔落伤害 · 溺水 · 岩浆与着火 · 仙人掌扎人 · 食物与进食 · 饱食回血 · 死亡掉落与重生
+**Survival**: health / hunger / saturation / air · fall damage · drowning · lava & fire · cactus damage · food & eating · regen when well-fed · death drops & respawn
 
-**方块系统**：50+ 种方块 · 挖掘硬度与工具等级（木/石/铁/金/钻石 五级工具，速度和耐久还原 MC 数值）· 裂纹动画 · 重力方块（沙/沙砾下落）· 火把/梯子贴墙与支撑检查 · 玻璃 · 冰（挖掉变水）
+**Block system**: 50+ block types · mining hardness & tool tiers (wood / stone / iron / gold / diamond — speed and durability tuned to MC values) · crack animation · gravity blocks (sand / gravel fall) · wall-mounted torches/ladders with support checks · glass · ice (turns to water when mined)
 
-**合成与熔炼**：2×2 / 3×3 合成（60+ 配方，支持镜像）· 熔炉（燃料/进度/点燃发光）· 箱子存储 · 工具/武器/TNT/桶/打火石/储物块等
+**Crafting & smelting**: 2×2 / 3×3 crafting (60+ recipes, mirror-aware) · furnace (fuel / progress / lit glow) · chest storage · tools / weapons / TNT / buckets / flint and steel / storage blocks
 
-**流体**：水与岩浆流动扩散 · 无限水源（2源造水）· 水遇岩浆生成黑曜石/圆石 · 铁桶取放液体
+**Fluids**: water & lava flow and spread · infinite water source (2 sources) · water meeting lava forms obsidian / cobblestone · buckets pick up & place liquids
 
-**生物**：猪/牛/羊（掉肉、皮革、羊毛）· 僵尸（夜间出没、白天燃烧）· 苦力怕（嘶嘶声+爆炸）· 生成与上限规则 · 死亡动画与掉落
+**Mobs**: pig / cow / sheep (drop meat, leather, wool) · zombie (spawns at night, burns by day) · creeper (hiss + explosion) · spawn & cap rules · death animations & drops
 
-**农业**：锄地 · 种子（打草掉落）· 小麦 8 阶段生长 · 面包 · 踩踏耕地 · 树苗成树 · 草蔓延 · 树叶腐烂
+**Farming**: hoe tilling · seeds (from breaking grass) · wheat 8-stage growth · bread · trampling farmland · saplings grow into trees · grass spread · leaf decay
 
-**其他**：TNT（打火石点燃、连锁爆炸、弹坑）· 爆炸破坏与抗性 · 粒子系统 · 程序化音效与环境音乐（WebAudio 合成，无音频文件）· 成就系统 · 多世界存档（自动保存到 localStorage）· 创造模式 · 第三人称 · F3 调试
+**Other**: TNT (ignite with flint and steel, chain explosions, craters) · explosion damage & resistance · particle system · procedural sound effects & ambient music (WebAudio synthesis, no audio files) · achievements · multi-world saves (auto-saved to localStorage) · creative mode · third person · F3 debug
 
-## 起步小贴士
+## Getting-started tips
 
-1. 空手打树干 → 获得原木 → 合成木板 → 4 块木板拼工作台
-2. 工作台里：木板+木棍 → 木镐 → 挖石头 → 石质工具
-3. 8 块圆石 → 熔炉；煤+木棍 → 火把（晚上很重要！）
-4. 天黑前挖个洞或搭个小屋——僵尸和苦力怕会来
-5. 铁矿要石镐才能挖，钻石要铁镐（在 y=15 以下找）
-6. 杀苦力怕掉火药，火药+沙子 → TNT（用打火石点）
+1. Punch a tree trunk → get logs → craft planks → 4 planks make a crafting table
+2. At the table: planks + sticks → wooden pickaxe → mine stone → stone tools
+3. 8 cobblestone → furnace; coal + stick → torches (very important at night!)
+4. Dig a hole or build a shelter before dark — zombies and creepers come out
+5. Iron ore needs a stone pickaxe; diamond needs an iron pickaxe (find it below y=15)
+6. Kill creepers for gunpowder; gunpowder + sand → TNT (ignite with flint and steel)
 
-## 测试
+## Tests
 
 ```bash
-node test/logic-test.js      # 49 项核心逻辑测试
-node test/shot.js            # headless Chrome 截图冒烟测试
+node test/logic-test.js      # 49 core logic tests
+node test/shot.js            # headless Chrome screenshot smoke test
 ```
 
-## 技术说明
+## Technical notes
 
-- 16×16×128 区块列，按需流式生成与卸载
-- 程序化贴图：512² 图集，全部 16×16 像素画由代码生成（含生物皮肤、工具图标）
-- 自定义网格生成：逐面剔除 + 逐顶点 AO/平滑光照，水面降高，按 tile 独立 mipmap
-- 光照引擎：天光垂直注入 + BFS 增减量传播，跨区块边界交换
-- 实体：逐轴扫掠碰撞、盒装模型（MC 皮肤 UV 展开布局）、简单 AI 状态机
-- 存档：RLE + base64 压缩的修改列，localStorage 持久化
+- 16×16×128 chunk columns, streamed generation & unloading on demand
+- Procedural textures: 512² atlas, all 16×16 pixel art generated in code (including mob skins and tool icons)
+- Custom mesh generation: per-face culling + per-vertex AO / smooth lighting, lowered water surface, per-tile mipmaps
+- Lighting engine: vertical skylight injection + BFS add/remove propagation, exchanged across chunk borders
+- Entities: per-axis swept collision, box models (MC skin UV layout), simple AI state machines
+- Saves: RLE + base64 compressed modified columns, persisted to localStorage

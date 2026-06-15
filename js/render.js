@@ -1,10 +1,10 @@
-// ============ render.js — WebGL2 渲染管线 ============
+// ============ render.js — WebGL2 render pipeline ============
 'use strict';
 var Render = (function () {
   var gl, canvas;
   var M = Util.M;
 
-  // ---------- 着色器源码 ----------
+  // ---------- shader source ----------
   var CHUNK_VS = '#version 300 es\nprecision highp float;\n' +
     'in vec3 aPos; in vec2 aUV; in vec2 aLight; in vec3 aTint;\n' +
     'uniform mat4 uVP; uniform vec3 uOrigin; uniform vec3 uCam;\n' +
@@ -91,7 +91,7 @@ var Render = (function () {
     '  float f = clamp((vDist - uFogRange.x) / (uFogRange.y - uFogRange.x), 0.0, 1.0);\n' +
     '  frag = vec4(mix(t.rgb * b, uFogCol, f), t.a); }';
 
-  // ---------- GL 工具 ----------
+  // ---------- GL utilities ----------
   function compile(type, src) {
     var s = gl.createShader(type);
     gl.shaderSource(s, src);
@@ -130,18 +130,18 @@ var Render = (function () {
   var dayF = 1;
   var timeSec = 0;
 
-  // ---------- 初始化 ----------
+  // ---------- initialization ----------
   function init(cv) {
     canvas = cv;
     gl = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' });
-    if (!gl) throw new Error('WebGL2 不可用');
+    if (!gl) throw new Error('WebGL2 not available');
     progChunk = program(CHUNK_VS, CHUNK_FS);
     progSky = program(SKY_VS, SKY_FS);
     progEnt = program(ENT_VS, ENT_FS);
     progLine = program(LINE_VS, LINE_FS);
     progPart = program(PART_VS, PART_FS);
 
-    // 图集纹理 + 分层 mip (不跨 tile)
+    // atlas texture + per-level mips (do not cross tile boundaries)
     atlasTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, atlasTex);
     uploadAtlas();
@@ -151,7 +151,7 @@ var Render = (function () {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, 4);
 
-    // 天空全屏三角
+    // sky fullscreen triangle
     skyVAO = gl.createVertexArray();
     gl.bindVertexArray(skyVAO);
     var sb = gl.createBuffer();
@@ -160,7 +160,7 @@ var Render = (function () {
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
-    // 选框线
+    // selection box lines
     lineVAO = gl.createVertexArray();
     gl.bindVertexArray(lineVAO);
     var lb = gl.createBuffer();
@@ -205,7 +205,7 @@ var Render = (function () {
     }
   }
 
-  // 水/岩浆动画上传
+  // water/lava animation upload
   function updateLiquidTiles(t) {
     var regions = Tex.tickLiquidAnim(t);
     if (!regions) return;
@@ -237,7 +237,7 @@ var Render = (function () {
     gl.viewport(0, 0, canvas.width, canvas.height);
   }
 
-  // ---------- 云 ----------
+  // ---------- clouds ----------
   function buildClouds() {
     var c = document.createElement('canvas');
     c.width = 256; c.height = 256;
@@ -262,7 +262,7 @@ var Render = (function () {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    // 云面片 (粒子着色器复用: pos + uv + light)
+    // cloud quad (reuses particle shader: pos + uv + light)
     cloudVAO = gl.createVertexArray();
     gl.bindVertexArray(cloudVAO);
     var vb = gl.createBuffer();
@@ -294,7 +294,7 @@ var Render = (function () {
       cx + S, y, cz + S, u1, v1, 255, 0,
       cx - S, y, cz + S, u0, v1, 255, 0
     ]);
-    // light 编码在 PART shader 是 0..255 → /255: 直接给 255 (天光满)
+    // light is encoded 0..255 in the PART shader → /255: just give 255 (full skylight)
     for (var i = 0; i < 6; i++) { data[i * 7 + 5] = 1.0; data[i * 7 + 6] = 0; }
     void lt; void worldTime;
     gl.useProgram(progPart.p);
@@ -318,7 +318,7 @@ var Render = (function () {
     gl.bindVertexArray(null);
   }
 
-  // ---------- 帧设置 ----------
+  // ---------- frame setup ----------
   function begin(eye, yaw, pitch, fov, renderDist, day, fog, tsec) {
     resize();
     camPos[0] = eye[0]; camPos[1] = eye[1]; camPos[2] = eye[2];
@@ -335,7 +335,7 @@ var Render = (function () {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   }
 
-  // 逆矩阵 (仅天空用, 4x4 通用求逆)
+  // inverse matrix (sky only, general 4x4 inversion)
   function invert(out, m) {
     var inv = new Float32Array(16);
     inv[0] = m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10];
@@ -361,7 +361,7 @@ var Render = (function () {
     return out;
   }
 
-  // ---------- 天空 ----------
+  // ---------- sky ----------
   function drawSky(sky) {
     invert(invVP, vp);
     gl.useProgram(progSky.p);
@@ -377,7 +377,7 @@ var Render = (function () {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindVertexArray(null);
 
-    // 太阳与月亮 (公告板)
+    // sun and moon (billboard)
     drawCelestial(Tex.region('sun'), sky.sunDir, 16, false);
     drawCelestial(Tex.region('moon'), [-sky.sunDir[0], -sky.sunDir[1], -sky.sunDir[2]], 11, false);
     gl.depthMask(true);
@@ -430,7 +430,7 @@ var Render = (function () {
     gl.bindVertexArray(null);
   }
 
-  // ---------- 区块网格 ----------
+  // ---------- chunk mesh ----------
   function uploadColumn(col, data) {
     deleteColumnMesh(col);
     col.mesh = { o: makeChunkVAO(data.o), t: makeChunkVAO(data.t) };
@@ -486,7 +486,7 @@ var Render = (function () {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, atlasTex);
     var i, col, m;
-    // 不透明 (近→远)
+    // opaque (near→far)
     gl.uniform1i(progChunk.u.uCutout, 1);
     gl.uniform1f(progChunk.u.uAlpha, 1);
     for (i = 0; i < cols.length; i++) {
@@ -497,7 +497,7 @@ var Render = (function () {
       gl.bindVertexArray(m.vao);
       gl.drawElements(gl.TRIANGLES, m.count, m.type, 0);
     }
-    // 半透明 (远→近)
+    // translucent (far→near)
     gl.uniform1i(progChunk.u.uCutout, 0);
     gl.uniform1f(progChunk.u.uAlpha, 0.8);
     gl.enable(gl.BLEND);
@@ -516,13 +516,13 @@ var Render = (function () {
     gl.bindVertexArray(null);
   }
 
-  // ---------- 实体 ----------
+  // ---------- entities ----------
   var partMeshes = {};   // modelName -> [per-part {vao,count}]
-  var blockCubeCache = {}; // blockId -> {vao,count} (掉落物/下落方块)
+  var blockCubeCache = {}; // blockId -> {vao,count} (dropped item / falling block)
   var itemQuadCache = {};  // tileIdx -> {vao,count}
 
   function buildBoxMesh(hw, hh, hd, rects, region) {
-    // rects: {top,bottom,right,front,left,back} 像素矩形 (区域内)
+    // rects: {top,bottom,right,front,left,back} pixel rectangles (within region)
     var pos = [], uv = [], shade = [], idx = [], vc = 0;
     function face(verts, rect, sh) {
       var u0 = (region.x + rect[0]) / 512, v0 = (region.y + rect[1]) / 512;
@@ -536,17 +536,17 @@ var Render = (function () {
       idx.push(vc, vc + 2, vc + 1, vc, vc + 3, vc + 2);
       vc += 4;
     }
-    // 前 -z (从前看: 左上,右上,右下,左下)
+    // front -z (viewed from front: top-left, top-right, bottom-right, bottom-left)
     face([[hw, hh, -hd], [-hw, hh, -hd], [-hw, -hh, -hd], [hw, -hh, -hd]], rects.front, 0.85);
-    // 后 +z
+    // back +z
     face([[-hw, hh, hd], [hw, hh, hd], [hw, -hh, hd], [-hw, -hh, hd]], rects.back, 0.85);
-    // 右 +x
+    // right +x
     face([[hw, hh, hd], [hw, hh, -hd], [hw, -hh, -hd], [hw, -hh, hd]], rects.right, 0.7);
-    // 左 -x
+    // left -x
     face([[-hw, hh, -hd], [-hw, hh, hd], [-hw, -hh, hd], [-hw, -hh, -hd]], rects.left, 0.7);
-    // 上 +y
+    // top +y
     face([[-hw, hh, -hd], [hw, hh, -hd], [hw, hh, hd], [-hw, hh, hd]], rects.top, 1.0);
-    // 下 -y
+    // bottom -y
     face([[-hw, -hh, hd], [hw, -hh, hd], [hw, -hh, -hd], [-hw, -hh, -hd]], rects.bottom, 0.6);
     return makeEntVAO(new Float32Array(pos), new Float32Array(uv), new Float32Array(shade), new Uint16Array(idx));
   }
@@ -578,13 +578,13 @@ var Render = (function () {
       for (var i = 0; i < model.parts.length; i++) {
         var p = model.parts[i];
         var rects = Tex2.boxUV(p.uv[0], p.uv[1], p.size[0], p.size[1], p.size[2]);
-        // 区域在绘制时按皮肤选择 → 网格 uv 基于默认 tex 区域; 不同皮肤同布局时共用模型但纹理区域不同
+        // region is chosen by skin at draw time → mesh uv is based on the default tex region; skins with the same layout share the model but use different texture regions
         meshes.push({ part: p, rectsRaw: rects });
       }
       partMeshes[name] = meshes;
     }
   }
-  // 每个 (model, skin) 组合的网格实例化缓存
+  // mesh instance cache for each (model, skin) combination
   var modelSkinCache = {};
   function meshesFor(modelName, skinName) {
     var key = modelName + '|' + skinName;
@@ -603,14 +603,14 @@ var Render = (function () {
     return out;
   }
 
-  // 方块小立方体 (掉落物 / 下落方块 / TNT实体)
+  // small block cube (dropped item / falling block / TNT entity)
   function blockCube(id) {
     if (blockCubeCache[id]) return blockCubeCache[id];
     var b = Blocks.BLOCKS[id];
     var faces = b.faces; // [+x,-x,+y,-y,+z,-z]
     var pos = [], uv = [], shade = [], idx = [], vc = 0;
     var tintCol = b.tint ? [0.57, 0.74, 0.35] : null;
-    void tintCol; // 染色烘焙进着色器不可行, 掉落物用原灰度即可
+    void tintCol; // baking tint into the shader is not feasible; dropped items just use the raw grayscale
     var T2 = 16 / 512;
     function face(verts, tileI, sh) {
       var u = Tex.uv(tileI);
@@ -635,7 +635,7 @@ var Render = (function () {
     return m;
   }
 
-  // 物品面片
+  // item quad
   function itemQuad(tileI) {
     if (itemQuadCache[tileI]) return itemQuadCache[tileI];
     var u = Tex.uv(tileI);
@@ -671,7 +671,7 @@ var Render = (function () {
     gl.drawElements(gl.TRIANGLES, mesh.count, gl.UNSIGNED_SHORT, 0);
   }
 
-  // ---------- 选框 / 裂纹 ----------
+  // ---------- selection box / crack overlay ----------
   function drawSelection(x, y, z, box) {
     gl.useProgram(progLine.p);
     gl.uniformMatrix4fv(progLine.u.uVP, false, vp);
@@ -741,7 +741,7 @@ var Render = (function () {
     gl.bindVertexArray(null);
   }
 
-  // ---------- 粒子 ----------
+  // ---------- particles ----------
   var partVAO = null, partVB = null;
   function ensurePartBuf() {
     if (partVAO) return;
@@ -760,7 +760,7 @@ var Render = (function () {
     ensurePartBuf();
     var cy = Math.cos(yaw), sy = Math.sin(yaw);
     var cp = Math.cos(pitch), sp = Math.sin(pitch);
-    // 相机右/上向量
+    // camera right/up vectors
     var rx = cy, ry = 0, rz = -sy;
     var ux2 = sy * sp, uy2 = cp, uz2 = cy * sp;
     var data = new Float32Array(list.length * 42);
@@ -799,7 +799,7 @@ var Render = (function () {
 
   function clearDepth() { gl.clear(gl.DEPTH_BUFFER_BIT); }
 
-  // ---------- 第一人称手持 ----------
+  // ---------- first-person held item ----------
   var heldM = M.create();
   function drawHeldItem(stack, light, anim) {
     gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -823,7 +823,7 @@ var Render = (function () {
     M.rotateY(m, m, -sw * 0.55);
     M.rotateX(m, m, -sw * 0.85);
     if (!stack) {
-      // 空手手臂
+      // empty-hand arm
       var meshes = meshesFor('humanoid', 'skin_player');
       var arm = null;
       for (var i = 0; i < meshes.length; i++) if (meshes[i].part.name === 'armR') arm = meshes[i];

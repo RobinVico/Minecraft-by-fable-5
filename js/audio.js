@@ -1,4 +1,4 @@
-// ============ audio.js — WebAudio 程序化音效 + 生成式音乐 ============
+// ============ audio.js — WebAudio procedural sound effects + generative music ============
 'use strict';
 var Sfx = (function () {
   var ctx = null, master = null, musicGain = null;
@@ -18,7 +18,7 @@ var Sfx = (function () {
       musicGain = ctx.createGain();
       musicGain.gain.value = 0.35;
       musicGain.connect(master);
-      // 白噪声缓冲
+      // white noise buffer
       var len = ctx.sampleRate * 1.5;
       noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
       var d = noiseBuf.getChannelData(0);
@@ -34,7 +34,7 @@ var Sfx = (function () {
   }
   function setMusic(on) { musicOn = on; }
 
-  // 3D 定位: 由玩家位置/朝向计算音量与声像
+  // 3D positioning: compute volume and pan from player position/orientation
   function spatial(pos) {
     if (!pos || !window.Player) return { vol: 1, pan: 0 };
     var P = Player.P;
@@ -42,7 +42,7 @@ var Sfx = (function () {
     var d = Math.hypot(dx, dy, dz);
     var vol = 1 / (1 + d * 0.13);
     if (d > 28) return { vol: 0, pan: 0 };
-    // 右向量 = (cos yaw, 0, -sin yaw)
+    // right vector = (cos yaw, 0, -sin yaw)
     var rx = Math.cos(P.yaw), rz = -Math.sin(P.yaw);
     var pan = d > 0.5 ? Util.clamp((dx * rx + dz * rz) / d * 0.8, -1, 1) : 0;
     return { vol: vol, pan: pan };
@@ -64,7 +64,7 @@ var Sfx = (function () {
     return g;
   }
 
-  // 噪声爆发
+  // noise burst
   function noise(opts) {
     var t = ctx.currentTime;
     var src = ctx.createBufferSource();
@@ -85,7 +85,7 @@ var Sfx = (function () {
     g.gain.exponentialRampToValueAtTime(0.001, t + (opts.dur || 0.2));
     src.start(t, Math.random(), (opts.dur || 0.2) + 0.05);
   }
-  // 音调
+  // tone
   function tone(opts) {
     var t = ctx.currentTime + (opts.delay || 0);
     var o = ctx.createOscillator();
@@ -108,7 +108,7 @@ var Sfx = (function () {
     o.stop(t + (opts.dur || 0.15) + 0.05);
   }
 
-  // 材质 → 噪声参数
+  // material → noise parameters
   var MAT = {
     stone: { freq: 520, q: 0.8, dur: 0.12, vol: 0.4 },
     wood: { freq: 240, q: 1.2, dur: 0.1, vol: 0.45 },
@@ -220,8 +220,8 @@ var Sfx = (function () {
     }
   }
 
-  // ---------- 生成式音乐 ----------
-  var musicTimer = 120; // 秒
+  // ---------- generative music ----------
+  var musicTimer = 120; // seconds
   var pentatonic = [0, 2, 4, 7, 9, 12, 14, 16];
   function musicTick(dt, calm) {
     if (!musicOn || !ctx) return;
@@ -241,7 +241,7 @@ var Sfx = (function () {
       var f = base * Math.pow(2, pentatonic[prev] / 12);
       var dur = Math.random() < 0.3 ? 1.2 : 0.6;
       (function (f2, t2, d2) {
-        // 柔和拨弦: 正弦 + 轻微泛音, 接 musicGain
+        // soft pluck: sine + slight overtone, connected to musicGain
         var tt = ctx.currentTime + t2;
         var o = ctx.createOscillator();
         o.type = 'sine';
@@ -264,7 +264,7 @@ var Sfx = (function () {
     }
   }
 
-  // 环境音 (洞穴)
+  // ambient sound (caves)
   var caveTimer = 60;
   function ambientTick(dt, underground) {
     if (!ctx) return;

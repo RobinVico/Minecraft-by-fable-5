@@ -1,16 +1,16 @@
-// ============ textures.js — 程序化贴图图集 (方块) ============
+// ============ textures.js — procedural texture atlas (blocks) ============
 'use strict';
 var Tex = (function () {
   var SIZE = 512, TILE = 16, COLS = SIZE / TILE;
-  var atlas = null, actx = null;          // 图集 canvas
+  var atlas = null, actx = null;          // atlas canvas
   var tileIdx = {};                        // name -> index
-  var tileCanvas = {};                     // name -> 16x16 canvas (供图标用)
+  var tileCanvas = {};                     // name -> 16x16 canvas (for icons)
   var painters = [];                       // [ [name, fn] ]
   var nextIdx = 0;
-  var regions = {};                        // 大块区域 (生物皮肤等) name -> {x,y,w,h}
+  var regions = {};                        // large regions (mob skins, etc.) name -> {x,y,w,h}
   var regionCursor = { x: 0, y: 256, rowH: 0 };
 
-  // ---------- 颜色工具 ----------
+  // ---------- color utilities ----------
   function hex(c) {
     if (Array.isArray(c)) return c;
     var n = parseInt(c.slice(1), 16);
@@ -23,7 +23,7 @@ var Tex = (function () {
     return [a[0] + (b[0] - a[0]) * t | 0, a[1] + (b[1] - a[1]) * t | 0, a[2] + (b[2] - a[2]) * t | 0, a[3] + (b[3] - a[3]) * t | 0];
   }
 
-  // ---------- 画笔 ----------
+  // ---------- brush ----------
   function Painter(rand) {
     var img = new Uint8ClampedArray(TILE * TILE * 4);
     this.img = img; this.rand = rand;
@@ -39,7 +39,7 @@ var Tex = (function () {
     };
     this.fill = function (c) { for (var y = 0; y < TILE; y++) for (var x = 0; x < TILE; x++) this.px(x, y, c); };
     this.rect = function (x0, y0, w, h, c) { for (var y = y0; y < y0 + h; y++) for (var x = x0; x < x0 + w; x++) this.px(x, y, c); };
-    // 平滑噪声: cells x cells 随机格点双线性
+    // smooth noise: cells x cells random grid points, bilinear
     this.noiseFn = function (cells) {
       var g = []; var r = this.rand;
       for (var i = 0; i < cells * cells; i++) g.push(r());
@@ -54,7 +54,7 @@ var Tex = (function () {
         return a + (b - a) * tx + (c + (d - c) * tx - (a + (b - a) * tx)) * ty;
       };
     };
-    // 调色板噪声填充 (MC 风格斑驳)
+    // palette noise fill (MC-style mottling)
     this.noiseTile = function (pal, cells, jitter) {
       var n = this.noiseFn(cells || 4); var r = this.rand;
       for (var y = 0; y < TILE; y++) for (var x = 0; x < TILE; x++) {
@@ -68,7 +68,7 @@ var Tex = (function () {
 
   function tile(name, fn) { painters.push([name, fn]); }
 
-  // ---------- 方块贴图定义 ----------
+  // ---------- block texture definitions ----------
   function defineBlockTiles() {
     var grays = function (base, steps, spread) {
       var p = []; for (var i = 0; i < steps; i++) p.push(shade(base, 1 - spread / 2 + spread * i / (steps - 1)));
@@ -82,12 +82,12 @@ var Tex = (function () {
       p.noiseTile(['#79553a', '#866043', '#8f6b4b', '#6f4f33'], 5, 0.7);
       p.speckle('#5d4027', 14);
     });
-    tile('grass_top', function (p) { // 灰度, 运行时染色
+    tile('grass_top', function (p) { // grayscale, tinted at runtime
       p.noiseTile(grays('#9b9b9b', 4, 0.3), 5, 0.6);
       p.speckle('#787878', 10);
     });
     tile('grass_side', function (p) {
-      // 泥土底 + 顶部草沿
+      // dirt base + grass fringe on top
       p.noiseTile(['#79553a', '#866043', '#8f6b4b', '#6f4f33'], 5, 0.7);
       var r = p.rand;
       for (var x = 0; x < TILE; x++) {
@@ -108,7 +108,7 @@ var Tex = (function () {
     tile('cobble', function (p) {
       p.fill('#4f4f4f');
       var r = p.rand;
-      // 4x4 抖动石块
+      // 4x4 jittered cobblestones
       for (var gy = 0; gy < 4; gy++) for (var gx = 0; gx < 4; gx++) {
         var c = shade('#828282', 0.8 + r() * 0.45);
         var x0 = gx * 4 + ((r() * 2) | 0) - 1, y0 = gy * 4 + ((r() * 2) | 0) - 1;
@@ -135,12 +135,12 @@ var Tex = (function () {
         for (var y = board * 4; y < board * 4 + 4; y++) {
           for (var x = 0; x < TILE; x++) {
             var c = bc;
-            if (y % 4 === 3) c = shade(bc, 0.72);                      // 横缝
-            else if (r() < 0.1) c = shade(bc, 0.88 + r() * 0.2);       // 木纹
+            if (y % 4 === 3) c = shade(bc, 0.72);                      // horizontal seam
+            else if (r() < 0.1) c = shade(bc, 0.88 + r() * 0.2);       // wood grain
             p.px(x, y, c);
           }
         }
-        var seam = (r() * TILE) | 0;                                    // 竖缝
+        var seam = (r() * TILE) | 0;                                    // vertical seam
         for (var yy = board * 4; yy < board * 4 + 3; yy++) p.px(seam, yy, shade(bc, 0.7));
       }
     }
@@ -169,7 +169,7 @@ var Tex = (function () {
         for (var y = v; y < TILE - v; y++) { p.px(v, y, rings[i % 4]); p.px(TILE - 1 - v, y, rings[i % 4]); }
         if (v >= 7) break;
       }
-      // 用 wood 色调
+      // use the wood color tone
       void wood;
     }
     tile('log_oak', function (p) { logSide(p, '#4e3a23', '#6b5232'); });
@@ -177,7 +177,7 @@ var Tex = (function () {
     tile('log_birch', function (p) {
       var r = p.rand;
       p.noiseTile(['#d5d8cf', '#e7eae1', '#dee1d6'], 4, 0.4);
-      for (var i = 0; i < 9; i++) { // 黑斑
+      for (var i = 0; i < 9; i++) { // black spots
         var x = (r() * TILE) | 0, y = (r() * TILE) | 0, w = 1 + ((r() * 3) | 0);
         for (var dx = 0; dx < w; dx++) p.px(x + dx, y, '#2e2e28');
       }
@@ -186,12 +186,12 @@ var Tex = (function () {
     tile('log_spruce', function (p) { logSide(p, '#2e2113', '#4a3823'); });
     tile('log_spruce_top', function (p) { logTop(p, '#3a2c19', '#80603a'); });
 
-    function leaves(p) { // 灰度镂空, 运行时染色
+    function leaves(p) { // grayscale cutout, tinted at runtime
       var r = p.rand;
       var n = p.noiseFn(5);
       for (var y = 0; y < TILE; y++) for (var x = 0; x < TILE; x++) {
         var v = n(x, y) + (r() - 0.5) * 0.55;
-        if (v < 0.22) continue; // 镂空
+        if (v < 0.22) continue; // cutout
         var g = 70 + v * 110 + (r() - 0.5) * 30;
         p.px(x, y, [g | 0, g | 0, g | 0, 255]);
       }
@@ -234,7 +234,7 @@ var Tex = (function () {
       for (var i = 0; i < TILE; i++) {
         p.px(i, 0, '#dbf0f4'); p.px(i, 15, '#dbf0f4'); p.px(0, i, '#dbf0f4'); p.px(15, i, '#dbf0f4');
       }
-      // 高光斜线
+      // highlight diagonal
       for (i = 0; i < 5; i++) { p.px(2 + i, 6 - i, '#ffffff'); p.px(3 + i, 6 - i, [255, 255, 255, 140]); }
     });
     tile('ice', function (p) {
@@ -264,7 +264,7 @@ var Tex = (function () {
     tile('tnt_side', function (p) {
       p.noiseTile(['#d04a35', '#c4402c', '#db5440'], 4, 0.25);
       p.rect(0, 6, 16, 4, '#e8e0d4');
-      // "TNT" 3x5 字
+      // "TNT" 3x5 glyphs
       var F = { T: ['111', '010', '010', '010', '010'], N: ['101', '111', '111', '111', '101'] };
       var word = ['T', 'N', 'T'], ox = 2;
       for (var li = 0; li < 3; li++) {
@@ -293,7 +293,7 @@ var Tex = (function () {
       p.px(7, 5, '#f8a13c'); p.px(8, 5, '#ff8c2e');
     });
 
-    // 箱子 / 工作台 / 熔炉
+    // chest / crafting table / furnace
     tile('chest_top', function (p) {
       planks(p, '#9c7f4e');
       for (var i = 0; i < TILE; i++) { p.px(i, 0, '#5d4527'); p.px(i, 15, '#5d4527'); p.px(0, i, '#5d4527'); p.px(15, i, '#5d4527'); }
@@ -315,14 +315,14 @@ var Tex = (function () {
     });
     tile('table_side', function (p) {
       planks(p, '#9c7f4e');
-      // 锯
+      // saw
       p.rect(2, 3, 5, 3, '#9b9b9b');
       for (var i = 0; i < 5; i++) p.px(2 + i, 6, i % 2 ? '#8a8a8a' : '#6f6f6f');
       p.rect(1, 4, 1, 1, '#5d4527');
     });
     tile('table_front', function (p) {
       planks(p, '#9c7f4e');
-      // 锤子+材料格
+      // hammer + material slot
       p.rect(9, 3, 4, 2, '#8a8a8a'); p.rect(10, 5, 1, 4, '#6d4d2c');
       p.rect(3, 4, 3, 3, '#6e552e'); p.rect(4, 5, 1, 1, '#caa564');
     });
@@ -361,7 +361,7 @@ var Tex = (function () {
       p.fill('#5f5f5f');
       var r = p.rand;
       var bricks = [[0, 0, 8, 8], [8, 0, 8, 8], [0, 8, 8, 8], [8, 8, 8, 8]];
-      // 错缝
+      // staggered seams
       bricks = [[0, 0, 8, 4], [8, 0, 8, 4], [4, 4, 8, 4], [-4, 4, 8, 4], [12, 4, 8, 4],
                 [0, 8, 8, 4], [8, 8, 8, 4], [4, 12, 8, 4], [-4, 12, 8, 4], [12, 12, 8, 4]];
       for (var i = 0; i < bricks.length; i++) {
@@ -405,7 +405,7 @@ var Tex = (function () {
     });
     tile('pumpkin_face', function (p) {
       painters_run('pumpkin_side', p);
-      // 三角眼 + 锯齿嘴
+      // triangular eyes + jagged mouth
       p.rect(3, 5, 3, 2, '#3b2003'); p.px(4, 4, '#3b2003');
       p.rect(10, 5, 3, 2, '#3b2003'); p.px(11, 4, '#3b2003');
       p.rect(4, 10, 8, 2, '#3b2003');
@@ -421,7 +421,7 @@ var Tex = (function () {
       p.px(6, 12, '#ffd83a'); p.px(9, 12, '#ffd83a');
     });
 
-    // 植物
+    // plants
     tile('dandelion', function (p) {
       p.fill([0, 0, 0, 0]);
       p.rect(7, 8, 1, 7, '#3f7a23');
@@ -451,7 +451,7 @@ var Tex = (function () {
       p.rect(6, 5, 4, 1, '#db423a');
       p.px(6, 6, '#f4f0e6'); p.px(9, 7, '#f4f0e6'); p.px(8, 5, '#f4f0e6');
     });
-    function tallGrassP(p) { // 灰度染色
+    function tallGrassP(p) { // grayscale, tinted
       p.fill([0, 0, 0, 0]);
       var r = p.rand;
       for (var i = 0; i < 8; i++) {
@@ -490,7 +490,7 @@ var Tex = (function () {
     tile('sapling_birch', saplingP('#74a83e', '#5f9230'));
     tile('sapling_spruce', saplingP('#2e5b32', '#234c27'));
 
-    // 小麦 8 阶段
+    // wheat, 8 stages
     for (var st = 0; st < 8; st++) {
       (function (stage) {
         tile('wheat_' + stage, function (p) {
@@ -509,7 +509,7 @@ var Tex = (function () {
       })(st);
     }
 
-    // 储物块
+    // storage blocks
     function metalBlock(p, base, hi, lo) {
       p.fill(base);
       var r = p.rand;
@@ -524,11 +524,11 @@ var Tex = (function () {
     tile('block_gold', function (p) { metalBlock(p, '#f5ce42', '#fdf0a6', '#c79a1e'); });
     tile('block_diamond', function (p) { metalBlock(p, '#63dbd4', '#bdf7f2', '#3aa9a2'); });
 
-    // 水/岩浆 (动画帧 0; 动画在 repaintLiquid 中重绘)
+    // water/lava (animation frame 0; animation is repainted in repaintLiquid)
     tile('water', function (p) { paintWater(p, 0); });
     tile('lava', function (p) { paintLava(p, 0); });
 
-    // 裂纹 10 阶段
+    // crack overlay, 10 stages
     for (var ci = 0; ci < 10; ci++) {
       (function (stage) {
         tile('crack_' + stage, function (p) {
@@ -550,7 +550,7 @@ var Tex = (function () {
     }
   }
 
-  // 水/岩浆动画重绘
+  // water/lava animation repaint
   function paintWater(p, t) {
     for (var y = 0; y < TILE; y++) for (var x = 0; x < TILE; x++) {
       var v = Math.sin((y + t * 1.6) * 0.55 + Math.sin((x * 0.6 + t * 0.9)) * 1.1) * 0.35 +
@@ -573,11 +573,11 @@ var Tex = (function () {
     }
   }
 
-  // 重复执行某个已注册画家 (叠加用)
+  // re-run an already-registered painter (for layering)
   var painterMap = {};
   function painters_run(name, p) { painterMap[name](p); }
 
-  // ---------- 构建 ----------
+  // ---------- build ----------
   function buildTileBitmap(name, fn) {
     var rand = Util.mulberry32(Util.strSeed('tile:' + name));
     var p = new Painter(rand);
@@ -587,7 +587,7 @@ var Tex = (function () {
 
   function build() {
     defineBlockTiles();
-    if (typeof Tex2 !== 'undefined') Tex2.define(tile); // 物品/工具等
+    if (typeof Tex2 !== 'undefined') Tex2.define(tile); // items/tools, etc.
     atlas = document.createElement('canvas');
     atlas.width = SIZE; atlas.height = SIZE;
     actx = atlas.getContext('2d', { willReadFrequently: true });
@@ -599,7 +599,7 @@ var Tex = (function () {
       var img = buildTileBitmap(name, fn);
       var tx = (idx % COLS) * TILE, ty = ((idx / COLS) | 0) * TILE;
       actx.putImageData(new ImageData(img, TILE, TILE), tx, ty);
-      // 独立 canvas 供图标
+      // separate canvas for icons
       var c = document.createElement('canvas');
       c.width = TILE; c.height = TILE;
       c.getContext('2d').putImageData(new ImageData(img.slice(), TILE, TILE), 0, 0);
@@ -618,8 +618,8 @@ var Tex = (function () {
     return r;
   }
 
-  // 把 blocks.js 的 tex 名解析为 faces[6] tile 索引
-  // 面顺序: 0:+x 1:-x 2:+y(top) 3:-y(bottom) 4:+z 5:-z
+  // resolve blocks.js tex names into faces[6] tile indices
+  // face order: 0:+x 1:-x 2:+y(top) 3:-y(bottom) 4:+z 5:-z
   function resolveBlockFaces() {
     var BL = Blocks.BLOCKS;
     for (var id = 0; id < BL.length; id++) {
@@ -637,11 +637,11 @@ var Tex = (function () {
     }
   }
 
-  function uv(idx) { // tile 索引 → [u0,v0] (uv 尺寸 = TILE/SIZE)
+  function uv(idx) { // tile index → [u0,v0] (uv size = TILE/SIZE)
     return [(idx % COLS) * TILE / SIZE, ((idx / COLS) | 0) * TILE / SIZE];
   }
 
-  // 动画: 重画水/岩浆 tile, 返回需要上传的区域列表
+  // animation: repaint water/lava tiles, return the list of regions to upload
   var animPainters = null;
   function tickLiquidAnim(timeSec) {
     if (!actx) return null;

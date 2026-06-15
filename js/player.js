@@ -1,4 +1,4 @@
-// ============ player.js — 玩家控制 / 交互 / 生存状态 ============
+// ============ player.js — player control / interaction / survival state ============
 'use strict';
 var Player = (function () {
   var B = Blocks.B, BL = Blocks.BLOCKS;
@@ -41,7 +41,7 @@ var Player = (function () {
     P.fireT = 0;
   }
 
-  // ---------- 输入 ----------
+  // ---------- input ----------
   function onMouseMove(dx, dy, sens) {
     if (P.dead) return;
     var s = (sens || 1) * 0.0024;
@@ -74,12 +74,12 @@ var Player = (function () {
     return Util.dirFromAngles(P.yaw, P.pitch);
   }
 
-  // ---------- 移动 ----------
+  // ---------- movement ----------
   function update(dt, uiOpen) {
     if (P.dead) return;
     var keys = uiOpen ? {} : P.keys;
 
-    // 液体/攀爬状态
+    // liquid/climbing state
     var fx = Math.floor(P.pos[0]), fz = Math.floor(P.pos[2]);
     var feetId = world.getBlock(fx, Math.floor(P.pos[1] + 0.1), fz);
     var midId = world.getBlock(fx, Math.floor(P.pos[1] + 0.9), fz);
@@ -93,11 +93,11 @@ var Player = (function () {
     if (P.sneaking || P.food <= 6) P.sprinting = false;
     if (!keys['KeyW']) P.sprinting = false;
 
-    // 视点高度 (潜行下降)
+    // eye height (lowered when sneaking)
     var targetEye = P.sneaking ? 1.5 : 1.62;
     P.eyeHCur += (targetEye - P.eyeHCur) * Math.min(1, dt * 14);
 
-    // 期望移动方向
+    // desired movement direction
     var ix = 0, iz = 0;
     if (keys['KeyW']) iz -= 1;
     if (keys['KeyS']) iz += 1;
@@ -106,7 +106,7 @@ var Player = (function () {
     var il = Math.hypot(ix, iz);
     if (il > 0) { ix /= il; iz /= il; }
     var sy = Math.sin(P.yaw), cy = Math.cos(P.yaw);
-    // 相对朝向: forward = (-sin, -cos), right = (cos, -sin)
+    // relative to facing: forward = (-sin, -cos), right = (cos, -sin)
     var wx = (-sy) * (-iz) + cy * ix;
     var wz = (-cy) * (-iz) + (-sy) * ix;
 
@@ -121,7 +121,7 @@ var Player = (function () {
     P.vel[0] += (wx * speed - P.vel[0]) * Math.min(1, accel * dt);
     P.vel[2] += (wz * speed - P.vel[2]) * Math.min(1, accel * dt);
 
-    // 垂直
+    // vertical
     if (P.flying) {
       var vy = 0;
       if (keys['Space']) vy = speed * 0.8;
@@ -149,7 +149,7 @@ var Player = (function () {
       }
     }
 
-    // 移动 + 碰撞 (潜行防坠)
+    // movement + collision (sneak fall-off prevention)
     var dx = P.vel[0] * dt, dy = P.vel[1] * dt, dz = P.vel[2] * dt;
     if (P.sneaking && P.onGround && !P.flying) {
       if (!hasSupport(dx, 0)) { dx = 0; P.vel[0] = 0; }
@@ -164,11 +164,11 @@ var Player = (function () {
     if (hit.z) P.vel[2] = 0;
     if (hit.y) {
       if (prevVy < 0 && P.onGround) {
-        // 落地伤害
+        // fall damage
         if (P.fallDist > 3.4 && P.gamemode === 'survival') {
           var dmg = Math.floor(P.fallDist - 3);
           if (dmg > 0) {
-            hurt(dmg, 0, 0, '摔落');
+            hurt(dmg, 0, 0, 'Falling');
             Sfx.play('fall_hurt', { pitch: 1 });
           }
         }
@@ -183,14 +183,14 @@ var Player = (function () {
     }
     if (P.flying && P.onGround) P.flying = false;
 
-    // 虚空
+    // the void
     if (P.pos[1] < -12) {
       P.pos[1] = -12;
-      if (P.gamemode === 'survival') hurt(4, 0, 0, '虚空');
+      if (P.gamemode === 'survival') hurt(4, 0, 0, 'the Void');
       else { P.pos[1] = 80; P.vel[1] = 0; }
     }
 
-    // 视角摆动
+    // view bobbing
     var hsp = Math.hypot(P.vel[0], P.vel[2]);
     if (P.onGround && hsp > 0.5) {
       P.bobPhase += hsp * dt * 1.6;
@@ -203,13 +203,13 @@ var Player = (function () {
     if (P.equipT > 0) P.equipT = Math.max(0, P.equipT - dt * 4);
     void wasOnGround;
 
-    // 岩浆点燃
+    // Lava ignition
     if (P.inLava && P.gamemode === 'survival') {
       P.fireT = 80;
-      if ((Game.tickNo() & 7) === 0) hurt(4, 0, 0, '岩浆');
+      if ((Game.tickNo() & 7) === 0) hurt(4, 0, 0, 'Lava');
     }
 
-    // 交互
+    // interaction
     if (!uiOpen) {
       handleMining(dt);
       handleUse(dt);
@@ -233,7 +233,7 @@ var Player = (function () {
     }
   }
 
-  // 潜行支撑检测
+  // sneak support detection
   function hasSupport(dx, dz) {
     var x0 = P.pos[0] + dx - P.w, x1 = P.pos[0] + dx + P.w;
     var z0 = P.pos[2] + dz - P.w, z1 = P.pos[2] + dz + P.w;
@@ -292,7 +292,7 @@ var Player = (function () {
     return hit;
   }
 
-  // ---------- 挖掘与攻击 ----------
+  // ---------- mining and attack ----------
   function currentTarget() {
     var eye = eyePos(), dir = lookDir();
     return world.raycast(eye[0], eye[1], eye[2], dir[0], dir[1], dir[2], P.gamemode === 'creative' ? 5 : 4.5, false);
@@ -305,7 +305,7 @@ var Player = (function () {
       return;
     }
     var eye = eyePos(), dir = lookDir();
-    // 攻击实体优先
+    // attacking entities takes priority
     var entHit = Ent.raycastEntity(eye[0], eye[1], eye[2], dir[0], dir[1], dir[2], 3.3);
     var blockHit = currentTarget();
     if (entHit && (!blockHit || entHit.dist < blockHit.dist)) {
@@ -329,7 +329,7 @@ var Player = (function () {
     if (!b || b.hard < 0) { P.mineTarget = null; P.mineProgress = 0; return; }
     if (P.swingT <= 0.3) P.swingT = 1;
 
-    // 目标变化重置
+    // reset on target change
     if (!P.mineTarget || P.mineTarget.x !== blockHit.x || P.mineTarget.y !== blockHit.y || P.mineTarget.z !== blockHit.z) {
       P.mineTarget = blockHit;
       P.mineProgress = 0;
@@ -382,7 +382,7 @@ var Player = (function () {
     var tool = st ? Blocks.toolOf(st.id) : null;
     Ent.blockBreakParticles(hit.x, hit.y, hit.z, id);
     Sfx.play('break_' + (b.sound || 'stone'), { pos: [hit.x, hit.y, hit.z] });
-    // 冰 → 水
+    // Ice → Water
     if (id === B.ICE && !creative) {
       var below = world.getBlock(hit.x, hit.y - 1, hit.z);
       if (below && BL[below].solid) {
@@ -415,10 +415,10 @@ var Player = (function () {
     Inv.markDirty();
   }
 
-  // ---------- 使用 / 放置 ----------
+  // ---------- use / place ----------
   function handleUse(dt) {
     var st = Inv.held();
-    // 进食
+    // eating
     if (P.mouseR && st && Blocks.foodOf(st.id) && (P.food < 20 || P.gamemode === 'creative')) {
       P.eatT += dt;
       if ((Game.tickNo() % 5) === 0) {
@@ -442,7 +442,7 @@ var Player = (function () {
     var hit = currentTarget();
     var stId = st ? st.id : 0;
 
-    // 桶装液体 (对准液体源)
+    // bucket up liquid (aimed at a liquid source)
     if (stId === Blocks.IT.BUCKET) {
       var eye = eyePos(), dir = lookDir();
       var lhit = world.raycast(eye[0], eye[1], eye[2], dir[0], dir[1], dir[2], 4.5, true);
@@ -459,7 +459,7 @@ var Player = (function () {
     if (!hit) return;
 
     var hb = BL[hit.id];
-    // 互动方块
+    // interactive blocks
     if (!P.sneaking) {
       if (hit.id === B.CRAFTING_TABLE) { UI.openContainer('craft'); P.placeCD = 0.3; return; }
       if (hit.id === B.FURNACE || hit.id === B.FURNACE_LIT) {
@@ -476,7 +476,7 @@ var Player = (function () {
     }
     if (!st) return;
 
-    // 打火石点TNT
+    // light TNT with flint and steel
     if (stId === Blocks.IT.FLINT_STEEL && hit.id === B.TNT) {
       world.setBlock(hit.x, hit.y, hit.z, B.AIR);
       Ent.igniteTNT(hit.x + 0.5, hit.y, hit.z + 0.5, 80);
@@ -485,7 +485,7 @@ var Player = (function () {
       P.placeCD = 0.3;
       return;
     }
-    // 锄地
+    // till soil
     if (Blocks.toolOf(stId) && Blocks.toolOf(stId).type === 'hoe') {
       if ((hit.id === B.GRASS || hit.id === B.DIRT) && hit.fy === 1 &&
           world.getBlock(hit.x, hit.y + 1, hit.z) === B.AIR) {
@@ -497,7 +497,7 @@ var Player = (function () {
       }
       return;
     }
-    // 播种
+    // sow seeds
     if (stId === Blocks.IT.SEEDS) {
       if (hit.id === B.FARMLAND && hit.fy === 1 && world.getBlock(hit.x, hit.y + 1, hit.z) === B.AIR) {
         world.setBlock(hit.x, hit.y + 1, hit.z, B.WHEAT, 0);
@@ -507,7 +507,7 @@ var Player = (function () {
       }
       return;
     }
-    // 倒桶
+    // empty bucket
     if (stId === Blocks.IT.BUCKET_WATER || stId === Blocks.IT.BUCKET_LAVA) {
       var tx2 = hit.x + hit.fx, ty2 = hit.y + hit.fy, tz2 = hit.z + hit.fz;
       var tid = world.getBlock(tx2, ty2, tz2);
@@ -519,7 +519,7 @@ var Player = (function () {
       }
       return;
     }
-    // 放置方块
+    // place block
     if (Blocks.isBlockItem(stId)) {
       placeBlock(st, hit);
       return;
@@ -541,11 +541,11 @@ var Player = (function () {
     if (cur !== B.AIR && !(BL[cur] && BL[cur].replaceable)) return;
 
     var meta = 0;
-    // 火把朝向
+    // Torch facing
     if (id === B.TORCH) {
       if (hit.fy === 1) meta = 0;
       else if (hit.fy === 0 && !replaceTarget) {
-        // 贴墙: 支撑墙在 -face 方向
+        // wall-mounted: support wall is in the -face direction
         var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
         meta = 0;
         for (var di = 0; di < 4; di++) {
@@ -555,7 +555,7 @@ var Player = (function () {
       } else if (hit.fy === -1) return;
       if (!world.torchSupport(px, py, pz, meta)) return;
     }
-    // 梯子
+    // Ladder
     if (id === B.LADDER) {
       if (hit.fy !== 0 || replaceTarget) return;
       var dirs2 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -565,23 +565,23 @@ var Player = (function () {
       }
       if (meta < 0) return;
     }
-    // 朝向方块 (面对玩家)
+    // facing block (faces the player)
     if (b.facing) {
       var ang = Util.mod(P.yaw, Math.PI * 2);
-      // 玩家朝向的反方向: front 面对玩家
+      // opposite of the player's facing: front faces the player
       var dx2 = -Math.sin(P.yaw), dz2 = -Math.cos(P.yaw);
       if (Math.abs(dx2) > Math.abs(dz2)) meta = dx2 > 0 ? 3 : 2;
       else meta = dz2 > 0 ? 1 : 0;
       void ang;
     }
-    // 作物只能放耕地
+    // crops can only go on farmland
     if (id === B.WHEAT) return;
-    // 仙人掌限制
+    // Cactus restriction
     if (id === B.CACTUS) {
       var below2 = world.getBlock(px, py - 1, pz);
       if (below2 !== B.SAND && below2 !== B.CACTUS) return;
     }
-    // 植物限制
+    // plant restriction
     if (b.render === 'cross' && id !== B.DEAD_BUSH) {
       var below3 = world.getBlock(px, py - 1, pz);
       if (id === B.MUSHROOM_BROWN || id === B.MUSHROOM_RED) {
@@ -589,7 +589,7 @@ var Player = (function () {
       } else if (below3 !== B.GRASS && below3 !== B.DIRT && below3 !== B.SNOWY_GRASS) return;
     }
 
-    // 与实体碰撞检查
+    // collision check against entities
     if (b.solid) {
       var bb = b.box || [0, 0, 0, 1, 1, 1];
       var blockBox = [px + bb[0], py + bb[1], pz + bb[2], px + bb[3], py + bb[4], pz + bb[5]];
@@ -613,16 +613,16 @@ var Player = (function () {
     Game.stat('placed', id);
   }
 
-  // ---------- 生存状态 (20Hz) ----------
+  // ---------- survival state (20Hz) ----------
   function tick20() {
     if (P.dead || P.gamemode === 'creative') return;
-    // 消化
+    // digestion
     if (P.exhaustion >= 4) {
       P.exhaustion -= 4;
       if (P.sat > 0) P.sat = Math.max(0, P.sat - 1);
       else P.food = Math.max(0, P.food - 1);
     }
-    // 回血
+    // heal
     if (P.food >= 18 && P.hp < 20) {
       P.regenT++;
       if (P.regenT >= 80) {
@@ -631,34 +631,34 @@ var Player = (function () {
         addExhaust(1.5);
       }
     } else P.regenT = 0;
-    // 饥饿伤害
+    // hunger damage
     if (P.food <= 0) {
       P.starveT++;
       if (P.starveT >= 80) {
         P.starveT = 0;
-        if (P.hp > 1) hurt(1, 0, 0, '饥饿');
+        if (P.hp > 1) hurt(1, 0, 0, 'Starving');
       }
     } else P.starveT = 0;
-    // 氧气
+    // air
     if (P.headInWater) {
       P.airT++;
       if (P.airT >= 30) {
         P.airT = 0;
         if (P.air > 0) P.air--;
-        else hurt(2, 0, 0, '溺水');
+        else hurt(2, 0, 0, 'Drowning');
       }
     } else {
       P.air = Math.min(10, P.air + 1);
       P.airT = 0;
     }
-    // 着火
+    // on fire
     if (P.fireT > 0) {
       P.fireT--;
       if (P.inWater) P.fireT = 0;
-      else if ((P.fireT % 20) === 0 && !P.inLava) hurt(1, 0, 0, '火焰');
+      else if ((P.fireT % 20) === 0 && !P.inLava) hurt(1, 0, 0, 'On fire');
     }
     if (P.hurtCD > 0) P.hurtCD--;
-    // 疾跑消耗
+    // sprint exhaustion
     if (P.sprinting) addExhaust(0.012);
   }
 
@@ -678,14 +678,14 @@ var Player = (function () {
     Sfx.play('hurt', {});
     if (P.hp <= 0) {
       P.hp = 0;
-      die(cause || '未知原因');
+      die(cause || 'Unknown cause');
     }
   }
 
   function die(cause) {
     P.dead = true;
     P.deathCause = cause;
-    // 撒落物品
+    // scatter items
     var inv = Inv.slots();
     for (var i = 0; i < inv.length; i++) {
       if (inv[i]) {
@@ -704,11 +704,11 @@ var Player = (function () {
   }
 
   function cameraState() {
-    // 视角摆动
+    // view bobbing
     var bobX = Math.sin(P.bobPhase) * 0.045 * P.bobAmp;
     var bobY = Math.abs(Math.cos(P.bobPhase)) * 0.05 * P.bobAmp;
     var eye = [P.pos[0], P.pos[1] + P.eyeHCur + bobY, P.pos[2]];
-    // 平移摆动沿视线右向
+    // lateral bob along the view's right vector
     eye[0] += Math.cos(P.yaw) * bobX;
     eye[2] += -Math.sin(P.yaw) * bobX;
     if (P.thirdPerson) {

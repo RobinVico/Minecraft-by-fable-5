@@ -1,10 +1,10 @@
-// ============ textures2.js — 物品/工具像素画、生物皮肤、GUI ============
+// ============ textures2.js — item/tool pixel art, mob skins, GUI ============
 'use strict';
 var Tex2 = (function () {
   var TILE = 16;
 
-  // ---------- 工具像素图 (字符画) ----------
-  // '.'=透明 S/s=木柄亮/暗 H/h/L=材质 基础/暗/亮
+  // ---------- tool pixel art (ASCII art) ----------
+  // '.'=transparent  S/s=wood handle light/dark  H/h/L=material base/dark/light
   var TOOL_MAPS = {
     pick: [
       '....HHHHH.......',
@@ -121,7 +121,7 @@ var Tex2 = (function () {
     };
   }
 
-  // ---------- 物品贴图 ----------
+  // ---------- item textures ----------
   function define(tile) {
     tile('item_stick', function (p) {
       p.fill([0, 0, 0, 0]);
@@ -139,7 +139,7 @@ var Tex2 = (function () {
     });
     function ingot(p, base, hi, lo) {
       p.fill([0, 0, 0, 0]);
-      // 两根叠起的锭
+      // two stacked ingots
       slab(p, 3, 8, 10, base, hi, lo);
       slab(p, 5, 4, 10, base, hi, lo);
     }
@@ -235,9 +235,9 @@ var Tex2 = (function () {
     function bucketP(fill) {
       return function (p) {
         p.fill([0, 0, 0, 0]);
-        // 提手
+        // handle
         for (var i = 0; i < 5; i++) p.px(5 + i, 3 - (i === 0 || i === 4 ? 0 : 1), '#9a9a9a');
-        // 桶身 (上宽下窄)
+        // bucket body (wider at top, narrower at bottom)
         for (var y = 0; y < 8; y++) {
           var inset = (y / 3) | 0;
           for (var x = 3 + inset; x <= 12 - inset; x++) {
@@ -254,12 +254,12 @@ var Tex2 = (function () {
     tile('item_bucket_lava', bucketP('#f88a1d'));
     tile('item_flint_steel', function (p) {
       p.fill([0, 0, 0, 0]);
-      // 钢圈 C 形
+      // steel ring, C shape
       var arc = [[9, 3], [11, 3], [8, 4], [12, 4], [7, 6], [13, 6], [7, 8], [13, 8], [8, 10], [12, 10], [9, 11], [11, 11], [10, 3]];
       for (var i = 0; i < arc.length; i++) p.px(arc[i][0], arc[i][1], '#b0b0b0');
       blob(p, 5, 11, 2.5, '#33373b', '#4a4f54', '#202326');
     });
-    // 工具 5x5
+    // tools 5x5
     var kinds = ['pick', 'axe', 'shovel', 'hoe', 'sword'];
     var mats = ['wood', 'stone', 'iron', 'gold', 'diamond'];
     for (var k = 0; k < kinds.length; k++) {
@@ -267,7 +267,7 @@ var Tex2 = (function () {
         tile('tool_' + kinds[k] + '_' + mats[m], charMapPainter(TOOL_MAPS[kinds[k]], TOOL_PAL[mats[m]]));
       }
     }
-    // 粒子
+    // particles
     tile('part_smoke', function (p) {
       p.fill([0, 0, 0, 0]);
       var r = p.rand;
@@ -314,8 +314,8 @@ var Tex2 = (function () {
     }
   }
 
-  // ---------- 生物模型 + 皮肤 ----------
-  // 部件: size[w,h,d](px), uv 区域内偏移, pivot 实体内挂点(px,脚底原点,y上,+z前), off 盒中心相对 pivot
+  // ---------- mob models + skins ----------
+  // part: size[w,h,d](px), uv offset within region, pivot is the attach point in the entity (px, origin at foot, y up, +z forward), off is box center relative to pivot
   var MODELS = {
     humanoid: {
       tex: 'skin_zombie', texW: 64, texH: 32, parts: [
@@ -368,22 +368,22 @@ var Tex2 = (function () {
       ]
     }
   };
-  // 玩家与僵尸同模型不同皮肤
+  // player and zombie share the model but use different skins
   var SKIN_FOR = { zombie: 'skin_zombie', player: 'skin_player' };
 
-  // MC 皮肤盒展开: 返回各面 [x,y,w,h] (相对皮肤区域)
+  // MC skin box unwrap: returns each face [x,y,w,h] (relative to the skin region)
   function boxUV(u, v, w, h, d) {
     return {
       top: [u + d, v, w, d],
       bottom: [u + d + w, v, w, d],
       right: [u, v + d, d, h],      // -x
-      front: [u + d, v + d, w, h],  // -z (脸朝 -z)
+      front: [u + d, v + d, w, h],  // -z (face points -z)
       left: [u + d + w, v + d, d, h],
       back: [u + d + w + d, v + d, w, h]
     };
   }
 
-  // ---------- 皮肤绘制 ----------
+  // ---------- skin painting ----------
   function paintRegions(alloc, ctx) {
     function fillRect(rg, r, c) { ctx.fillStyle = c; ctx.fillRect(rg.x + r[0], rg.y + r[1], r[2], r[3]); }
     function speck(rg, r, rand, colors, density) {
@@ -401,37 +401,37 @@ var Tex2 = (function () {
       }
     }
 
-    // -- 猪 --
+    // -- pig --
     var rg = alloc('skin_pig', 64, 32);
     var rand = Util.mulberry32(101);
     var headUV = boxUV(0, 0, 8, 8, 8), bodyUV = boxUV(24, 0, 10, 8, 14), legUV = boxUV(0, 16, 4, 6, 4);
     paintBoxAll(rg, headUV, '#eea4a4', rand, ['#e29393', '#f5b5b5']);
     paintBoxAll(rg, bodyUV, '#eea4a4', rand, ['#e29393', '#f5b5b5', '#d98484']);
     paintBoxAll(rg, legUV, '#e29393', rand, ['#d98484']);
-    // 脸: 眼 + 鼻
+    // face: eyes + snout
     px(rg, headUV.front[0] + 1, headUV.front[1] + 2, '#ffffff'); px(rg, headUV.front[0] + 1, headUV.front[1] + 3, '#1d1d3a');
     px(rg, headUV.front[0] + 6, headUV.front[1] + 2, '#ffffff'); px(rg, headUV.front[0] + 6, headUV.front[1] + 3, '#1d1d3a');
     fillRect(rg, [headUV.front[0] + 2, headUV.front[1] + 4, 4, 3], '#d98484');
     px(rg, headUV.front[0] + 3, headUV.front[1] + 5, '#a85e5e'); px(rg, headUV.front[0] + 4, headUV.front[1] + 5, '#a85e5e');
 
-    // -- 牛 --
+    // -- cow --
     rg = alloc('skin_cow', 64, 64);
     rand = Util.mulberry32(102);
     headUV = boxUV(0, 0, 8, 8, 6); bodyUV = boxUV(0, 32, 12, 10, 18); legUV = boxUV(0, 16, 4, 12, 4);
     paintBoxAll(rg, headUV, '#5d4232', rand, ['#4f3829', '#6e503d']);
     paintBoxAll(rg, bodyUV, '#5d4232', rand, ['#4f3829', '#6e503d']);
-    // 白斑
+    // white patches
     speck(rg, bodyUV.top, rand, ['#e8e4dc', '#dcd6ca'], 0.35);
     speck(rg, bodyUV.left, rand, ['#e8e4dc'], 0.25);
     speck(rg, bodyUV.right, rand, ['#e8e4dc'], 0.25);
     paintBoxAll(rg, legUV, '#4a3526', rand, ['#3c2b1e']);
-    // 白脸 + 眼 + 鼻
+    // white face + eyes + snout
     fillRect(rg, [headUV.front[0] + 2, headUV.front[1] + 3, 4, 5], '#e8e4dc');
     px(rg, headUV.front[0] + 1, headUV.front[1] + 2, '#ffffff'); px(rg, headUV.front[0] + 1, headUV.front[1] + 3, '#1d1d3a');
     px(rg, headUV.front[0] + 6, headUV.front[1] + 2, '#ffffff'); px(rg, headUV.front[0] + 6, headUV.front[1] + 3, '#1d1d3a');
     fillRect(rg, [headUV.front[0] + 3, headUV.front[1] + 6, 2, 2], '#caa28c');
 
-    // -- 羊 --
+    // -- sheep --
     rg = alloc('skin_sheep', 64, 64);
     rand = Util.mulberry32(103);
     headUV = boxUV(0, 0, 6, 6, 8); bodyUV = boxUV(0, 32, 10, 8, 16); legUV = boxUV(0, 16, 4, 12, 4);
@@ -443,7 +443,7 @@ var Tex2 = (function () {
     px(rg, headUV.front[0] + 4, headUV.front[1] + 2, '#ffffff'); px(rg, headUV.front[0] + 4, headUV.front[1] + 3, '#1d1d3a');
     fillRect(rg, [headUV.front[0] + 2, headUV.front[1] + 4, 2, 1], '#b08878');
 
-    // -- 苦力怕 --
+    // -- creeper --
     rg = alloc('skin_creeper', 64, 32);
     rand = Util.mulberry32(104);
     headUV = boxUV(0, 0, 8, 8, 8); bodyUV = boxUV(16, 16, 8, 12, 4); legUV = boxUV(0, 16, 4, 6, 4);
@@ -453,18 +453,18 @@ var Tex2 = (function () {
       for (var i = 0; i < 6; i++) { fillRect(rg, uvb[faces[i]], '#4fae4f'); speck(rg, uvb[faces[i]], rand, camo, 1.2); }
     }
     camoFill(headUV); camoFill(bodyUV); camoFill(legUV);
-    // 经典苦力怕脸
+    // classic creeper face
     var f = headUV.front;
     fillRect(rg, [f[0] + 1, f[1] + 2, 2, 2], '#0a0a0a'); fillRect(rg, [f[0] + 5, f[1] + 2, 2, 2], '#0a0a0a');
     fillRect(rg, [f[0] + 3, f[1] + 4, 2, 3], '#0a0a0a');
     fillRect(rg, [f[0] + 2, f[1] + 5, 1, 3], '#0a0a0a'); fillRect(rg, [f[0] + 5, f[1] + 5, 1, 3], '#0a0a0a');
 
-    // -- 僵尸 --
+    // -- zombie --
     rg = alloc('skin_zombie', 64, 32);
     rand = Util.mulberry32(105);
     paintHumanoid(rg, rand, { skin: '#6a9a4e', skinD: '#578040', shirt: '#3e8e8e', shirtD: '#347676', pants: '#4a3e8e', pantsD: '#3b3273', hair: '#3c5e2a', eye: '#1d1d1d' });
 
-    // -- 玩家 (Steve 风) --
+    // -- player (Steve style) --
     rg = alloc('skin_player', 64, 32);
     rand = Util.mulberry32(106);
     paintHumanoid(rg, rand, { skin: '#d3a07c', skinD: '#c08e6c', shirt: '#2ba2a2', shirtD: '#238888', pants: '#4658a8', pantsD: '#3a4a8e', hair: '#3b2a1a', eye: '#3b4ed8' });
@@ -472,28 +472,28 @@ var Tex2 = (function () {
     function paintHumanoid(rg, rand, c) {
       var hUV = boxUV(0, 0, 8, 8, 8), bUV = boxUV(16, 16, 8, 12, 4), aUV = boxUV(40, 16, 4, 12, 4), lUV = boxUV(0, 16, 4, 12, 4);
       paintBoxAll(rg, hUV, c.skin, rand, [c.skinD]);
-      // 头发
+      // hair
       fillRect(rg, hUV.top, c.hair);
       fillRect(rg, [hUV.front[0], hUV.front[1], 8, 2], c.hair);
       fillRect(rg, [hUV.back[0], hUV.back[1], 8, 3], c.hair);
       fillRect(rg, [hUV.left[0], hUV.left[1], 8, 2], c.hair);
       fillRect(rg, [hUV.right[0], hUV.right[1], 8, 2], c.hair);
-      // 脸
+      // face
       var f = hUV.front;
       px(rg, f[0] + 1, f[1] + 4, '#ffffff'); px(rg, f[0] + 2, f[1] + 4, c.eye);
       px(rg, f[0] + 6, f[1] + 4, '#ffffff'); px(rg, f[0] + 5, f[1] + 4, c.eye);
       fillRect(rg, [f[0] + 3, f[1] + 5, 2, 1], c.skinD);
       fillRect(rg, [f[0] + 2, f[1] + 7, 4, 1], c.skinD);
-      // 身体 = 上衣
+      // body = shirt
       paintBoxAll(rg, bUV, c.shirt, rand, [c.shirtD]);
-      // 手臂: 上衣袖2px + 皮肤
+      // arms: 2px shirt sleeve + skin
       paintBoxAll(rg, aUV, c.skin, rand, [c.skinD]);
       var fcs = ['right', 'front', 'left', 'back'];
       for (var i = 0; i < 4; i++) {
         var r2 = aUV[fcs[i]];
         fillRect(rg, [r2[0], r2[1], r2[2], 2], c.shirt);
       }
-      // 腿 = 裤子, 脚 2px 灰
+      // legs = pants, feet 2px gray
       paintBoxAll(rg, lUV, c.pants, rand, [c.pantsD]);
       for (i = 0; i < 4; i++) {
         var r3 = lUV[fcs[i]];
@@ -501,7 +501,7 @@ var Tex2 = (function () {
       }
     }
 
-    // -- 太阳 / 月亮 --
+    // -- sun / moon --
     rg = alloc('sun', 32, 32);
     ctx.fillStyle = '#fdf2b0'; ctx.fillRect(rg.x, rg.y, 32, 32);
     ctx.fillStyle = '#fff9d8'; ctx.fillRect(rg.x + 4, rg.y + 4, 24, 24);
@@ -517,7 +517,7 @@ var Tex2 = (function () {
     }
   }
 
-  // ---------- 物品图标 (DOM 用 dataURL) ----------
+  // ---------- item icons (dataURL for DOM) ----------
   var iconCache = {};
   function iconFor(id) {
     if (iconCache[id]) return iconCache[id];
@@ -586,19 +586,19 @@ var Tex2 = (function () {
     if (b.tint && sideName.indexOf('leaves') >= 0) { sideC = tintedTile(sideName, 1); frontC = sideC; }
     var leftD = darkened(frontC, 0.66), rightD = darkened(sideC, 0.82);
     x.imageSmoothingEnabled = false;
-    // 顶面
+    // top face
     x.setTransform(11 / 16, 5.5 / 16, -11 / 16, 5.5 / 16, 24, 4);
     x.drawImage(topC, 0, 0);
-    // 左面
+    // left face
     x.setTransform(11 / 16, 5.5 / 16, 0, 13 / 16, 13, 9.5 + 5.5);
     x.drawImage(leftD, 0, 0);
-    // 右面
+    // right face
     x.setTransform(11 / 16, -5.5 / 16, 0, 13 / 16, 24, 15 + 5.5);
     x.drawImage(rightD, 0, 0);
     x.setTransform(1, 0, 0, 1, 0, 0);
   }
 
-  // ---------- GUI 小图标 (心/食物/气泡) ----------
+  // ---------- GUI small icons (heart/food/bubble) ----------
   var guiCache = null;
   function gui() {
     if (guiCache) return guiCache;

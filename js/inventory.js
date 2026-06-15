@@ -1,15 +1,15 @@
-// ============ inventory.js — 物品栏 / 合成匹配 / 容器点击逻辑 ============
+// ============ inventory.js — inventory / recipe matching / container click logic ============
 'use strict';
 var Inv = (function () {
 
-  var slots = new Array(36).fill(null);   // 0-8 快捷栏, 9-35 背包
+  var slots = new Array(36).fill(null);   // 0-8 hotbar, 9-35 inventory
   var selected = 0;
-  var cursor = null;                      // 鼠标上的物品堆
+  var cursor = null;                      // item stack on the cursor
   var dirty = true;
 
   var craftGrid = new Array(9).fill(null);
-  var craftSize = 2;                      // 2 或 3
-  var openBE = null;                      // 当前打开的方块实体 (furnace/chest)
+  var craftSize = 2;                      // 2 or 3
+  var openBE = null;                      // currently open block entity (furnace/chest)
   var openType = null;
 
   function markDirty() { dirty = true; }
@@ -39,12 +39,12 @@ var Inv = (function () {
     markDirty();
   }
 
-  // 添加物品堆, 返回剩余数量
+  // Add an item stack, return the remaining amount
   function add(stack) {
     if (!stack || stack.n <= 0) return 0;
     var max = Blocks.stackMax(stack.id);
     var n = stack.n;
-    // 合并
+    // Merge
     if (stack.dur === undefined) {
       for (var pass = 0; pass < 2; pass++) {
         for (var i = 0; i < 36; i++) {
@@ -75,7 +75,7 @@ var Inv = (function () {
     return add({ id: id, n: n || 1 });
   }
 
-  // ---------- 配方匹配 ----------
+  // ---------- Recipe matching ----------
   function cellMatch(spec, cell) {
     if (!spec) return !cell;
     if (!cell) return false;
@@ -93,7 +93,7 @@ var Inv = (function () {
     return true;
   }
   function matchRecipe(grid, gw) {
-    // 边界框
+    // Bounding box
     var minR = 9, maxR = -1, minC = 9, maxC = -1, count = 0;
     for (var r = 0; r < gw; r++) for (var c = 0; c < gw; c++) {
       if (grid[r * gw + c]) {
@@ -120,7 +120,7 @@ var Inv = (function () {
         }
       } else if (rec.mix) {
         if (count !== rec.mix.length) continue;
-        // 多重集匹配
+        // Multiset matching
         var used = [];
         var ok = true;
         for (var mi = 0; mi < rec.mix.length; mi++) {
@@ -142,7 +142,7 @@ var Inv = (function () {
     var rec = matchRecipe(craftGrid, craftSize === 2 ? 2 : 3);
     return rec ? { id: rec.out.id, n: rec.out.n } : null;
   }
-  // 取走合成结果: 消耗材料
+  // Take the crafting result: consume the materials
   function consumeCraft() {
     var gw = craftSize === 2 ? 2 : 3;
     for (var i = 0; i < gw * gw; i++) {
@@ -155,7 +155,7 @@ var Inv = (function () {
     markDirty();
   }
 
-  // ---------- 槽位访问 ----------
+  // ---------- Slot access ----------
   function getSlot(area, i) {
     switch (area) {
       case 'hotbar': return slots[i];
@@ -182,9 +182,9 @@ var Inv = (function () {
     return a && b && a.id === b.id && a.dur === undefined && b.dur === undefined;
   }
 
-  // ---------- 点击逻辑 ----------
+  // ---------- Click logic ----------
   function clickSlot(area, i, button, shift) {
-    // 创造物品栏
+    // Creative inventory
     if (area === 'creative') {
       var cid = Blocks.CREATIVE[i];
       if (cid === undefined) return;
@@ -199,12 +199,12 @@ var Inv = (function () {
       markDirty();
       return;
     }
-    // 合成结果
+    // Crafting result
     if (area === 'result') {
       var res = craftResult();
       if (!res) return;
       if (shift) {
-        // 合成全部
+        // Craft all
         var guard = 0;
         while (guard++ < 64) {
           var r2 = craftResult();
@@ -228,15 +228,15 @@ var Inv = (function () {
       return;
     }
     var st = getSlot(area, i);
-    // 熔炉输出槽只能取
+    // Furnace output slot is take-only
     var outputOnly = (area === 'furnace' && i === 2);
 
     if (shift && st) {
-      // 快速移动
+      // Quick move
       quickMove(area, i, st);
       return;
     }
-    if (button === 0) { // 左键
+    if (button === 0) { // Left click
       if (!cursor) {
         if (st) { setSlot(area, i, null); cursor = st; }
       } else if (outputOnly) {
@@ -258,7 +258,7 @@ var Inv = (function () {
         setSlot(area, i, cursor);
         cursor = st;
       }
-    } else if (button === 2) { // 右键
+    } else if (button === 2) { // Right click
       if (!cursor) {
         if (st) {
           var half = Math.ceil(st.n / 2);
@@ -284,7 +284,7 @@ var Inv = (function () {
     setSlot(area, i, null);
     var left;
     if (area === 'main' || area === 'hotbar') {
-      // 移入打开的容器
+      // Move into the open container
       if (openType === 'chest' && openBE) {
         left = addToList(openBE.items, st);
       } else if (openType === 'furnace' && openBE) {
@@ -292,7 +292,7 @@ var Inv = (function () {
         else if (Blocks.fuelOf(st.id) > 0) left = addToListAt(openBE.items, 1, st);
         else left = st.n;
         if (left > 0) {
-          // 背包内互换区域
+          // Swap within the inventory region
           st.n = left;
           left = area === 'main' ? addToRange(0, 9, st) : addToRange(9, 36, st);
         }
@@ -302,7 +302,7 @@ var Inv = (function () {
         left = area === 'main' ? addToRange(0, 9, st) : addToRange(9, 36, st);
       }
     } else {
-      // 容器 → 背包
+      // Container → inventory
       left = add(st);
     }
     if (left > 0) {
@@ -359,14 +359,14 @@ var Inv = (function () {
     return n;
   }
 
-  // 打开/关闭容器
+  // Open/close container
   function openFor(type, be) {
     openType = type;
     openBE = be || null;
     craftSize = (type === 'craft') ? 3 : 2;
   }
   function closeContainer() {
-    // 合成格物品退回
+    // Return items from the crafting grid
     for (var i = 0; i < 9; i++) {
       if (craftGrid[i]) {
         var leftN = add(craftGrid[i]);

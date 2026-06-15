@@ -1,4 +1,4 @@
-// ============ worldgen.js — 地形生成 (群系/洞穴/矿脉/植被) ============
+// ============ worldgen.js — terrain generation (biome/cave/ore vein/vegetation) ============
 'use strict';
 var Gen = (function () {
   var B = Blocks.B;
@@ -8,7 +8,7 @@ var Gen = (function () {
   var nCont, nPeak, nTemp, nHum, nRough, nCaveA, nCaveB, nCheese;
 
   var BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, BIRCH: 4, TAIGA: 5, SNOWY: 6, DESERT: 7, MOUNTAIN: 8 };
-  var BIOME_NAMES = ['海洋', '沙滩', '平原', '森林', '桦木林', '针叶林', '雪原', '沙漠', '山地'];
+  var BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Birch Forest', 'Taiga', 'Snowy Tundra', 'Desert', 'Mountains'];
 
   function init(s) {
     seed = s | 0;
@@ -22,11 +22,11 @@ var Gen = (function () {
     nCheese = new Util.Perlin(seed ^ 0x8192a3);
   }
 
-  // ---------- 气候 / 高度 / 群系 (纯函数) ----------
+  // ---------- climate / height / biome (pure functions) ----------
   function contAt(x, z) { return nCont.fbm2(x / 620, z / 620, 4, 2, 0.5); }
   function peakAt(x, z) {
     var p = nPeak.fbm2(x / 300, z / 300, 3, 2, 0.5);
-    return Util.smooth(Util.clamp((p - 0.18) / 0.45, 0, 1)); // 0..1 山地强度
+    return Util.smooth(Util.clamp((p - 0.18) / 0.45, 0, 1)); // 0..1 mountain intensity
   }
   function climateAt(x, z) {
     return {
@@ -37,9 +37,9 @@ var Gen = (function () {
   function heightAt(x, z) {
     var cont = contAt(x, z);
     var base;
-    if (cont < -0.18) base = Util.lerp(40, 58, Util.clamp((cont + 0.55) / 0.37, 0, 1));        // 海底
-    else if (cont < -0.04) base = Util.lerp(58, 64, (cont + 0.18) / 0.14);                      // 海岸
-    else base = Util.lerp(64, 74, Util.clamp(cont / 0.5, 0, 1));                                // 内陆
+    if (cont < -0.18) base = Util.lerp(40, 58, Util.clamp((cont + 0.55) / 0.37, 0, 1));        // sea floor
+    else if (cont < -0.04) base = Util.lerp(58, 64, (cont + 0.18) / 0.14);                      // coast
+    else base = Util.lerp(64, 74, Util.clamp(cont / 0.5, 0, 1));                                // inland
     var inland = Util.clamp((cont + 0.04) / 0.2, 0, 1);
     var mt = peakAt(x, z) * inland;
     base += mt * 42;
@@ -52,7 +52,7 @@ var Gen = (function () {
     if (h < SEA - 1 && cont < -0.1) return BIOME.OCEAN;
     var c = climateAt(x, z);
     if (h <= SEA + 1.5) {
-      if (c.t < -0.35) return BIOME.SNOWY;            // 冻结湖岸
+      if (c.t < -0.35) return BIOME.SNOWY;            // frozen shore
       return (c.t > 0.4 && c.h < 0.15) ? BIOME.DESERT : BIOME.BEACH;
     }
     var inland = Util.clamp((cont + 0.04) / 0.2, 0, 1);
@@ -65,11 +65,11 @@ var Gen = (function () {
   }
   function biomeIsCold(b) { return b === BIOME.SNOWY || b === BIOME.TAIGA; }
 
-  // 草/叶染色: 由温湿度双线性
+  // grass/leaf tint: bilinear from temperature and humidity
   function tintAt(x, z) {
     var c = climateAt(x, z);
     var t = Util.clamp((c.t + 1) / 2, 0, 1), h = Util.clamp((c.h + 1) / 2, 0, 1);
-    // 角颜色: 干热 / 湿热 / 干冷 / 湿冷
+    // corner colors: dry-hot / wet-hot / dry-cold / wet-cold
     var dh = [191, 183, 85], wh = [85, 201, 60], dc = [128, 180, 151], wc = [96, 161, 123];
     var r = Util.lerp(Util.lerp(dc[0], dh[0], t), Util.lerp(wc[0], wh[0], t), h);
     var g = Util.lerp(Util.lerp(dc[1], dh[1], t), Util.lerp(wc[1], wh[1], t), h);
@@ -77,10 +77,10 @@ var Gen = (function () {
     return [r | 0, g | 0, b | 0];
   }
 
-  // ---------- 洞穴 ----------
+  // ---------- caves ----------
   function carved(x, y, z, h) {
     if (y < 5) return false;
-    if (h <= SEA + 2) { if (y > h - 7) return false; }      // 海底/滩涂不开天窗
+    if (h <= SEA + 2) { if (y > h - 7) return false; }      // no skylight openings on sea floor/tidal flats
     else if (y > h + 1) return false;
     var t = 0.072 + (1 - y / 128) * 0.03;
     var a = nCaveA.noise3(x * 0.017, y * 0.026, z * 0.017);
@@ -94,8 +94,8 @@ var Gen = (function () {
     return nCheese.noise3(x * 0.011, y * 0.017, z * 0.011) > 0.58;
   }
 
-  // ---------- 树 (确定性, 可跨区块) ----------
-  // 返回区块 (cx,cz) 内生成的树列表 [{x,y,z,type,h}] (世界坐标)
+  // ---------- trees (deterministic, can cross chunks) ----------
+  // returns list of trees generated within chunk (cx,cz) [{x,y,z,type,h}] (world coordinates)
   function treesFor(cx, cz) {
     var rng = Util.mulberry32(Util.hash2(seed ^ 0x77aa, cx, cz) * 4294967296 | 0);
     var trees = [];
@@ -130,7 +130,7 @@ var Gen = (function () {
     return trees;
   }
 
-  // 树形方块列表 (世界坐标 → id), 经回调输出
+  // tree block list (world coordinates → id), emitted via callback
   function stampTree(tree, put) {
     var x = tree.x, y0 = tree.y, z = tree.z, h = tree.h;
     var log, leaf, i, dx, dz, dy;
@@ -153,7 +153,7 @@ var Gen = (function () {
       }
     } else {
       for (i = 0; i < h; i++) put(x, y0 + i, z, log);
-      // 顶冠: 两层 r2 + 两层 r1
+      // canopy: two layers of r2 + two layers of r1
       for (dy = h - 3; dy <= h - 2; dy++) {
         for (dx = -2; dx <= 2; dx++) for (dz = -2; dz <= 2; dz++) {
           if (dx === 0 && dz === 0 && dy < h) continue;
@@ -173,7 +173,7 @@ var Gen = (function () {
     }
   }
 
-  // ---------- 主生成 ----------
+  // ---------- main generation ----------
   function generateColumn(world, col) {
     var cx = col.cx, cz = col.cz;
     var wx0 = cx * 16, wz0 = cz * 16;
@@ -182,7 +182,7 @@ var Gen = (function () {
     var heights = new Int16Array(256);
     var biomes = col.biomes;
 
-    // --- 地表与基底 ---
+    // --- surface and base ---
     for (var lz = 0; lz < 16; lz++) {
       for (var lx = 0; lx < 16; lx++) {
         var wx = wx0 + lx, wz = wz0 + lz;
@@ -191,15 +191,15 @@ var Gen = (function () {
         heights[lx | (lz << 4)] = h;
         biomes[lx | (lz << 4)] = bm;
         var base = lx | (lz << 4);
-        // 基岩
+        // bedrock
         blocks[base] = B.BEDROCK;
         for (var y = 1; y <= 3; y++) {
           if (Util.hash3(seed, wx, y, wz) < [0.8, 0.5, 0.25][y - 1]) blocks[base | (y << 8)] = B.BEDROCK;
           else blocks[base | (y << 8)] = B.STONE;
         }
-        // 石头
+        // stone
         for (y = 4; y <= h; y++) blocks[base | (y << 8)] = B.STONE;
-        // 表层
+        // surface layer
         var sandy = (bm === BIOME.DESERT || bm === BIOME.BEACH);
         var oceanic = bm === BIOME.OCEAN;
         if (sandy) {
@@ -210,21 +210,21 @@ var Gen = (function () {
           var top = fl < 0.4 ? B.SAND : (fl < 0.7 ? B.GRAVEL : B.DIRT);
           for (y = h; y > h - 3 && y > 0; y--) blocks[base | (y << 8)] = top;
         } else if (bm === BIOME.MOUNTAIN && h > 92) {
-          // 石质山顶
+          // stony mountain peak
         } else {
           var grassTop = biomeIsCold(bm) ? B.SNOWY_GRASS : B.GRASS;
           if (h <= SEA) grassTop = B.DIRT;
           blocks[base | (h << 8)] = grassTop;
           for (y = h - 1; y > h - 4 && y > 0; y--) blocks[base | (y << 8)] = B.DIRT;
         }
-        // 水
+        // water
         for (y = h + 1; y <= SEA; y++) blocks[base | (y << 8)] = B.WATER;
-        // 冰面
+        // ice surface
         if (h < SEA && (biomeIsCold(bm) || (bm === BIOME.OCEAN && climateAt(wx, wz).t < -0.4))) {
           blocks[base | (SEA << 8)] = B.ICE;
         }
 
-        // --- 洞穴 ---
+        // --- caves ---
         var capY = Math.min(h + 1, 127);
         for (y = 5; y <= capY; y++) {
           var bid = blocks[base | (y << 8)];
@@ -237,7 +237,7 @@ var Gen = (function () {
       }
     }
 
-    // --- 矿脉 ---
+    // --- ore veins ---
     function vein(ore, tries, yMin, yMax, size) {
       for (var i = 0; i < tries; i++) {
         var x = rng() * 16, z = rng() * 16;
@@ -267,7 +267,7 @@ var Gen = (function () {
     vein(B.ORE_GOLD, 2, 6, 30, 4);
     vein(B.ORE_DIAMOND, 1, 6, 15, 4);
 
-    // --- 树 (3x3 邻域确定性) ---
+    // --- trees (deterministic over 3x3 neighborhood) ---
     function put(x, y, z, id) {
       var lx2 = x - wx0, lz2 = z - wz0;
       if (lx2 < 0 || lx2 > 15 || lz2 < 0 || lz2 > 15 || y < 1 || y > 126) return;
@@ -286,7 +286,7 @@ var Gen = (function () {
       }
     }
 
-    // --- 小型植被/装饰 (仅本列) ---
+    // --- small vegetation/decoration (this column only) ---
     function surfaceOf(lx3, lz3) {
       for (var y3 = 127; y3 > 0; y3--) {
         var id3 = blocks[lx3 | (lz3 << 4) | (y3 << 8)];
@@ -297,7 +297,7 @@ var Gen = (function () {
     function deco(tries, fn) { for (var i2 = 0; i2 < tries; i2++) fn((rng() * 16) | 0, (rng() * 16) | 0); }
     var biomeC = biomes[8 | (8 << 4)];
 
-    // 草与花
+    // grass and flowers
     var grassN = biomeC === BIOME.PLAINS ? 14 : (biomeC === BIOME.FOREST || biomeC === BIOME.BIRCH ? 7 : 2);
     deco(grassN, function (lx4, lz4) {
       var s = surfaceOf(lx4, lz4);
@@ -319,7 +319,7 @@ var Gen = (function () {
         }
       });
     }
-    // 沙漠: 仙人掌/枯灌木
+    // desert: cactus/dead bush
     if (biomeC === BIOME.DESERT) {
       deco(3, function (lx4, lz4) {
         var s = surfaceOf(lx4, lz4);
@@ -332,7 +332,7 @@ var Gen = (function () {
         if (s.id === B.SAND && s.y < 126) blocks[lx4 | (lz4 << 4) | ((s.y + 1) << 8)] = B.DEAD_BUSH;
       });
     }
-    // 洞内蘑菇
+    // mushrooms inside caves
     if (rng() < 0.4) {
       deco(6, function (lx4, lz4) {
         var y4 = 8 + (rng() * 40 | 0);
@@ -342,7 +342,7 @@ var Gen = (function () {
         }
       });
     }
-    // 积雪 (寒冷群系 & 高山)
+    // snow cover (cold biomes & high mountains)
     for (lz = 0; lz < 16; lz++) {
       for (lx = 0; lx < 16; lx++) {
         var bm5 = biomes[lx | (lz << 4)];

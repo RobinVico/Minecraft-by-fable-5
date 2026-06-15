@@ -1,4 +1,4 @@
-// ============ main.js — 主循环 / 区块管理 / 存档 / 输入 ============
+// ============ main.js — main loop / chunk management / saving / input ============
 'use strict';
 var Game = (function () {
   var B = Blocks.B;
@@ -13,9 +13,9 @@ var Game = (function () {
   var liquidAnimT = 0;
   var saveT = 0;
   var pcx = 99999, pcz = 99999;
-  var desired = [];          // 期望加载的列坐标 (按距离排序)
+  var desired = [];          // desired column coords to load (sorted by distance)
   var genPtr = 0;
-  var activeKeys = new Set(); // tick 范围内的列
+  var activeKeys = new Set(); // columns within tick range
   var renderList = [];
   var unloadT = 0;
   var storageOK = true, storageWarned = false;
@@ -31,7 +31,7 @@ var Game = (function () {
     });
   })();
 
-  // ---------- 存储 ----------
+  // ---------- storage ----------
   function sget(k) {
     try { return localStorage.getItem(k); } catch (e) { return null; }
   }
@@ -41,7 +41,7 @@ var Game = (function () {
       storageOK = false;
       if (!storageWarned) {
         storageWarned = true;
-        UI.message('存储空间不足, 存档可能不完整');
+        UI.message('Out of storage space, save may be incomplete');
       }
       return false;
     }
@@ -57,7 +57,7 @@ var Game = (function () {
 
   function createWorld(name, seed, mode) {
     var id = 'w' + Date.now().toString(36);
-    if (!urlParams.test || urlParams.savetest) { // 测试模式不写存档 (savetest 除外)
+    if (!urlParams.test || urlParams.savetest) { // test mode does not write saves (except savetest)
       var list = listWorlds();
       list.unshift({ id: id, name: name, seed: seed, mode: mode, day: 0 });
       saveWorldsList(list);
@@ -74,7 +74,7 @@ var Game = (function () {
   }
   function deleteWorld(id) {
     saveWorldsList(listWorlds().filter(function (w) { return w.id !== id; }));
-    // 清除列数据
+    // clear column data
     var pre = 'minejs:w:' + id + ':';
     var del = [];
     try {
@@ -111,7 +111,7 @@ var Game = (function () {
     };
     sset('minejs:w:' + worldId + ':meta', JSON.stringify(meta));
     world.columns.forEach(function (col) { saveColumn(col); });
-    // 更新世界列表的天数
+    // update day count in the world list
     var list = listWorlds();
     for (var i = 0; i < list.length; i++) {
       if (list[i].id === worldId) { list[i].day = world.day; break; }
@@ -119,7 +119,7 @@ var Game = (function () {
     saveWorldsList(list);
   }
 
-  // ---------- 世界启动 ----------
+  // ---------- world startup ----------
   function startWorld(entry, meta) {
     worldId = entry.id;
     worldName = entry.name;
@@ -139,7 +139,7 @@ var Game = (function () {
     }
     var startPos = (meta && meta.player) ? meta.player.pos : spawn.slice();
 
-    // 预生成
+    // pregenerate
     var RD = Screens.opts.renderDist;
     var cx0 = Math.floor(startPos[0] / 16), cz0 = Math.floor(startPos[2] / 16);
     var queue = [];
@@ -150,14 +150,14 @@ var Game = (function () {
     }
     queue.sort(function (a, b) { return a[2] - b[2]; });
     var qi = 0;
-    Screens.showLoading('正在生成世界...', 0);
+    Screens.showLoading('Generating world...', 0);
     function pregen() {
       var t0 = performance.now();
       while (qi < queue.length && performance.now() - t0 < 30) {
         var q = queue[qi++];
         world.ensureColumn(q[0], q[1], loadColData(q[0], q[1]));
       }
-      Screens.showLoading('正在生成世界... ' + qi + '/' + queue.length, qi / queue.length);
+      Screens.showLoading('Generating world... ' + qi + '/' + queue.length, qi / queue.length);
       if (qi < queue.length) {
         requestAnimationFrame(pregen);
         return;
@@ -168,7 +168,7 @@ var Game = (function () {
   }
 
   function finishStart(entry, meta, spawn, startPos) {
-    // 安全落点
+    // safe landing spot
     if (!meta || !meta.player) {
       var sx = Math.floor(startPos[0]), sz = Math.floor(startPos[2]);
       var col = world.getColumnAt(sx, sz);
@@ -198,7 +198,7 @@ var Game = (function () {
     Screens.hideAll();
     if (!urlParams.test) requestLock();
     if (window.TEST) window.TEST.ready = true;
-    UI.message(meta ? '欢迎回来, ' + worldName : '欢迎来到 ' + worldName + '!');
+    UI.message(meta ? 'Welcome back, ' + worldName : 'Welcome to ' + worldName + '!');
     if (urlParams.test) applyTestParams();
   }
 
@@ -234,7 +234,7 @@ var Game = (function () {
     document.exitPointerLock && document.exitPointerLock();
   }
 
-  // ---------- 区块管理 ----------
+  // ---------- chunk management ----------
   function rebuildDesired() {
     var RD = Screens.opts.renderDist;
     desired = [];
@@ -279,7 +279,7 @@ var Game = (function () {
       pcx = ncx; pcz = ncz;
       rebuildDesired();
     }
-    // 生成
+    // generate
     var t0 = performance.now();
     var genN = 0;
     while (genPtr < desired.length && performance.now() - t0 < 5 && genN < 2) {
@@ -291,7 +291,7 @@ var Game = (function () {
       }
       genPtr++;
     }
-    // 网格重建
+    // mesh rebuild
     meshScratch.length = 0;
     world.columns.forEach(function (c) {
       if (c.dirtyMesh && colReady(c)) meshScratch.push(c);
@@ -315,7 +315,7 @@ var Game = (function () {
         if (performance.now() - t1 > 7 || built >= 4) break;
       }
     }
-    // 卸载
+    // unload
     unloadT++;
     if (unloadT > 90) {
       unloadT = 0;
@@ -336,7 +336,7 @@ var Game = (function () {
     }
   }
 
-  // ---------- 昼夜 ----------
+  // ---------- day/night ----------
   function dayFactor() {
     if (!world) return 1;
     var t = world.time;
@@ -356,7 +356,7 @@ var Game = (function () {
     function mixc(n, d2) { return [Util.lerp(n[0], d2[0], k), Util.lerp(n[1], d2[1], k), Util.lerp(n[2], d2[2], k)]; }
     var zen = mixc([0.012, 0.02, 0.055], [0.45, 0.64, 1.0]);
     var hor = mixc([0.05, 0.06, 0.12], [0.74, 0.84, 1.0]);
-    // 日落/日出橙色
+    // sunset/sunrise orange tint
     var tf = Math.sin(Math.PI * k);
     var sunset = Math.pow(Util.clamp(1 - Math.abs(sunDir[1]) * 2.2, 0, 1), 1.5) * tf;
     hor = [Util.lerp(hor[0], 1.0, sunset * 0.55), Util.lerp(hor[1], 0.5, sunset * 0.45), Util.lerp(hor[2], 0.28, sunset * 0.5)];
@@ -366,7 +366,7 @@ var Game = (function () {
     };
   }
 
-  // ---------- 主循环 ----------
+  // ---------- main loop ----------
   function loop(t) {
     requestAnimationFrame(loop);
     var dt = Math.min(0.08, (t - lastT) / 1000 || 0.016);
@@ -391,7 +391,7 @@ var Game = (function () {
       chunkTick();
     }
 
-    // 测试: 强制裂纹可视化
+    // test: force crack visualization
     if (urlParams.crack && testStage >= 1) {
       var hitC = Player.currentTarget();
       if (hitC) {
@@ -399,7 +399,7 @@ var Game = (function () {
         Player.P.mineProgress = +urlParams.crack;
       }
     }
-    // 渲染
+    // render
     var camS = Player.cameraState();
     var ds = dayState();
     var P = Player.P;
@@ -421,7 +421,7 @@ var Game = (function () {
     if (P.thirdPerson) drawPlayerModel();
     Render.drawParticles(Ent.particles(), camS.yaw, camS.pitch);
     if (Screens.opts.clouds) Render.drawClouds(world.time);
-    // 选框 + 裂纹
+    // selection box + crack
     if (!uiOpen) {
       var hit = Player.currentTarget();
       if (hit) {
@@ -440,7 +440,7 @@ var Game = (function () {
       });
     }
 
-    // 液体动画
+    // liquid animation
     liquidAnimT += dt;
     if (liquidAnimT > 0.25) {
       liquidAnimT = 0;
@@ -454,7 +454,7 @@ var Game = (function () {
     var underground = world.getSky(Math.floor(P.pos[0]), Math.floor(P.pos[1]), Math.floor(P.pos[2])) === 0 && P.pos[1] < 56;
     Sfx.ambientTick(dt, underground);
 
-    // 自动保存
+    // autosave
     saveT += dt;
     if (saveT > 25) {
       saveT = 0;
@@ -465,7 +465,7 @@ var Game = (function () {
   function doTick() {
     tickNo++;
     world.tick(activeKeys);
-    if (urlParams.time) world.time = +urlParams.time; // 测试: 钉死时间
+    if (urlParams.time) world.time = +urlParams.time; // test: pin the time
     if (urlParams.report && (tickNo % +urlParams.report) === 0) {
       var inv = Inv.slots().filter(Boolean).map(function (s) { return s.id + 'x' + s.n; }).join(' ');
       var ht = Player.currentTarget();
@@ -475,7 +475,7 @@ var Game = (function () {
     }
     if (!urlParams.freeze) Ent.tick(activeKeys);
     Player.tick20();
-    // 僵尸环境音
+    // zombie ambient sound
     if ((tickNo & 127) === 0) {
       var ents = Ent.list();
       for (var i = 0; i < ents.length; i++) {
@@ -487,7 +487,7 @@ var Game = (function () {
     }
   }
 
-  // 第三人称玩家模型
+  // third-person player model
   var pm1 = Util.M.create();
   function drawPlayerModel() {
     var P = Player.P;
@@ -515,17 +515,17 @@ var Game = (function () {
     }
   }
 
-  // ---------- 成就 ----------
+  // ---------- achievements ----------
   var ACH = {
-    wood: { title: '获得木头!', sub: '攻击一棵树直到木头掉落' },
-    stone: { title: '石器时代', sub: '挖到石头了' },
-    table: { title: '工作台!', sub: '木板拼成工作台' },
-    pick: { title: '采矿时间到!', sub: '制作一把镐' },
-    furnace: { title: '热腾腾的', sub: '用八块圆石做熔炉' },
-    sword: { title: '利剑出鞘', sub: '制作一把剑' },
-    bread: { title: '面包师', sub: '用小麦做面包' },
-    tnt: { title: '爆破专家', sub: '合成 TNT, 小心使用!' },
-    diamond: { title: '钻石!', sub: '挖到钻石了!' }
+    wood: { title: 'Getting Wood!', sub: 'Attack a tree until a Log drops' },
+    stone: { title: 'Stone Age', sub: 'Mine some stone' },
+    table: { title: 'Crafting Table!', sub: 'Make a Crafting Table from Planks' },
+    pick: { title: 'Time to Mine!', sub: 'Craft a Pickaxe' },
+    furnace: { title: 'Hot Topic', sub: 'Make a Furnace from eight Cobblestone' },
+    sword: { title: 'Blade Drawn', sub: 'Craft a Sword' },
+    bread: { title: 'The Baker', sub: 'Make Bread from Wheat' },
+    tnt: { title: 'Demolition Expert', sub: 'Craft TNT, use with care!' },
+    diamond: { title: 'Diamond!', sub: 'Mine some Diamond!' }
   };
   function ach(key, iconId) {
     if (stats.ach.indexOf(key) >= 0) return;
@@ -548,7 +548,7 @@ var Game = (function () {
     }
   }
 
-  // ---------- 输入 ----------
+  // ---------- input ----------
   var lockHint;
   function requestLock() {
     if (document.pointerLockElement === canvas) return;
@@ -641,7 +641,7 @@ var Game = (function () {
       if (document.hidden && playing && !paused && !urlParams.test) pause();
     });
     window.addEventListener('resize', function () { Render.resize(); });
-    // 点击页面任意处激活音频
+    // click anywhere on the page to enable audio
     document.addEventListener('mousedown', function () { Sfx.ensure(); }, { once: true });
   }
 
@@ -658,12 +658,12 @@ var Game = (function () {
     requestLock();
   }
 
-  // ---------- 启动 ----------
+  // ---------- startup ----------
   function boot() {
     canvas = document.getElementById('game');
     Tex.build();
     if (urlParams.atlas) {
-      // 图集检查模式
+      // atlas inspection mode
       var a = Tex.atlasCanvas();
       a.style.cssText = 'position:absolute;top:0;left:0;width:768px;height:768px;image-rendering:pixelated;z-index:99;background:#345';
       document.body.appendChild(a);
@@ -684,13 +684,13 @@ var Game = (function () {
     if (urlParams.test) {
       setupTest();
       if (urlParams.dist) Screens.opts.renderDist = Util.clamp(+urlParams.dist, 2, 10);
-      createWorld('测试世界', urlParams.seed || '12345', urlParams.mode || 'survival');
+      createWorld('Test World', urlParams.seed || '12345', urlParams.mode || 'survival');
     } else {
       Screens.showTitle();
     }
   }
 
-  // URL 测试指令 (headless 截图驱动) — 帧计数驱动保证执行
+  // URL test commands (headless screenshot driven) — frame-count driven to guarantee execution
   var testStage = 0, testFrames = -1, tfCalls = 0, aplCalls = 0;
   function testFrameTick() {
     tfCalls++;
@@ -715,7 +715,7 @@ var Game = (function () {
         applyStage1();
         if (urlParams.open) {
           if (urlParams.open === 'furnace' || urlParams.open === 'chest') {
-            // 就近找方块实体
+            // find the nearest block entity
             var fb = urlParams.open === 'furnace' ? Blocks.B.FURNACE : Blocks.B.CHEST;
             var fpx = Math.floor(Player.P.pos[0]), fpy = Math.floor(Player.P.pos[1]), fpz = Math.floor(Player.P.pos[2]);
             var done = false;
@@ -740,7 +740,7 @@ var Game = (function () {
         }
         if (urlParams.third) Player.P.thirdPerson = true;
         if (urlParams.warp) {
-          // 同步快进 N 刻 (含玩家逻辑)
+          // synchronously fast-forward N ticks (including player logic)
           var wn = Math.min(2000, +urlParams.warp);
           for (var wi = 0; wi < wn; wi++) {
             Player.update(0.05, UI.isOpen());
@@ -822,7 +822,7 @@ var Game = (function () {
         }
       }
       if (urlParams.cave) {
-        // 找一个深处洞穴空腔
+        // find a deep cave cavity
         outer2:
         for (var cx2 = -4; cx2 <= 4; cx2++) for (var cz2 = -4; cz2 <= 4; cz2++) {
           var col2 = world.getColumn(cx2, cz2);
@@ -855,7 +855,7 @@ var Game = (function () {
           var my = mcol ? mcol.height[(Math.floor(mx) & 15) | ((Math.floor(mz) & 15) << 4)] : Player.P.pos[1];
           var e = Ent.spawnMob(a[0], mx, my, mz);
           if (e && urlParams.freeze) {
-            // 面向玩家
+            // face the player
             e.yaw = Math.atan2(-(Player.P.pos[0] - mx), -(Player.P.pos[2] - mz));
           }
         });
@@ -866,7 +866,7 @@ var Game = (function () {
           var bx2 = Math.floor(Player.P.pos[0]) + a[0];
           var bz3 = Math.floor(Player.P.pos[2]) + a[2];
           var by;
-          if (a[1] === 99) { // 99 = 贴地
+          if (a[1] === 99) { // 99 = on the ground
             var c3 = world.getColumnAt(bx2, bz3);
             by = c3 ? c3.height[(bx2 & 15) | ((bz3 & 15) << 4)] : Math.floor(Player.P.pos[1]);
           } else {

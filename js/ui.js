@@ -1,10 +1,10 @@
-// ============ ui.js — HUD / 容器窗口 / 提示 ============
+// ============ ui.js — HUD / container windows / tooltips ============
 'use strict';
 var UI = (function () {
   var els = {};
   var openType = null;
   var openBEPos = null;
-  var slotEls = [];      // 打开窗口中的槽位元素
+  var slotEls = [];      // slot elements in the open window
   var hotbarEls = [];
   var heartEls = [], foodEls = [], airEls = [];
   var lastHudState = '';
@@ -36,7 +36,7 @@ var UI = (function () {
     els.toasts = $('toasts');
     els.deathScreen = $('death-screen');
 
-    // 快捷栏
+    // Hotbar
     for (var i = 0; i < 9; i++) {
       var s = mk('div', 'slot hotbar-slot', els.hotbar);
       s.dataset.area = 'hotbar';
@@ -44,7 +44,7 @@ var UI = (function () {
       buildSlotInner(s);
       hotbarEls.push(s);
     }
-    // 心/食物/气泡
+    // Hearts / food / bubbles
     var gui = Tex2.gui();
     for (i = 0; i < 10; i++) {
       var h = mk('img', 'stat-icon', els.hearts);
@@ -58,7 +58,7 @@ var UI = (function () {
       airEls.push(a);
     }
 
-    // 窗口事件
+    // Window events
     els.winroot.addEventListener('mousedown', function (e) {
       var slot = e.target.closest('.slot');
       if (slot && slot.dataset.area) {
@@ -119,7 +119,7 @@ var UI = (function () {
   // ---------- HUD ----------
   function updateHUD() {
     var P = Player.P;
-    // 快捷栏
+    // Hotbar
     if (Inv.isDirty()) {
       var slots = Inv.slots();
       for (var i = 0; i < 9; i++) {
@@ -130,7 +130,7 @@ var UI = (function () {
       var st = Inv.held();
       if (st) showHeldName(Blocks.name(st.id));
     }
-    // 状态条
+    // Status bars
     var state = P.hp + '|' + P.food + '|' + P.air + '|' + P.headInWater + '|' + P.gamemode;
     if (state !== lastHudState) {
       lastHudState = state;
@@ -148,7 +148,7 @@ var UI = (function () {
       els.air.style.display = P.headInWater ? 'flex' : 'none';
       els.hearts.classList.toggle('low', P.hp <= 6);
     }
-    // 屏幕色调
+    // Screen tint
     var tint = '';
     if (P.headInWater) tint = 'rgba(20,40,120,0.32)';
     else if (P.inLava) tint = 'rgba(220,80,10,0.5)';
@@ -182,7 +182,7 @@ var UI = (function () {
     setTimeout(function () { els.damage.style.opacity = 0; }, 120);
   }
 
-  // ---------- 容器窗口 ----------
+  // ---------- Container windows ----------
   function isOpen() { return openType !== null; }
   function currentOpen() { return openType; }
 
@@ -230,23 +230,23 @@ var UI = (function () {
 
     if (type === 'inv') {
       if (Player.P.gamemode === 'creative') return buildCreative(win, title);
-      title.textContent = '物品栏';
+      title.textContent = 'Inventory';
       var top = mk('div', 'win-row', win);
-      mk('div', 'win-label', top).textContent = '合成';
+      mk('div', 'win-label', top).textContent = 'Crafting';
       var c2 = mk('div', 'craft-area', top);
       slotGrid(c2, 'craft', 4, 2);
       mk('div', 'craft-arrow', c2).textContent = '→';
       var rg = slotGrid(c2, 'result', 1, 1);
       rg.querySelector('.slot').classList.add('result-slot');
     } else if (type === 'craft') {
-      title.textContent = '工作台';
+      title.textContent = 'Crafting Table';
       var c3 = mk('div', 'craft-area', win);
       slotGrid(c3, 'craft', 9, 3);
       mk('div', 'craft-arrow', c3).textContent = '→';
       var rg2 = slotGrid(c3, 'result', 1, 1);
       rg2.querySelector('.slot').classList.add('result-slot');
     } else if (type === 'furnace') {
-      title.textContent = '熔炉';
+      title.textContent = 'Furnace';
       var fa = mk('div', 'furnace-area', win);
       var leftCol = mk('div', 'furnace-col', fa);
       slotGrid(leftCol, 'furnace', 1, 1).querySelector('.slot').dataset.idx = 0;
@@ -261,11 +261,11 @@ var UI = (function () {
       outG.querySelector('.slot').dataset.idx = 2;
       outG.querySelector('.slot').classList.add('result-slot');
     } else if (type === 'chest') {
-      title.textContent = '箱子';
+      title.textContent = 'Chest';
       slotGrid(win, 'chest', 27, 9);
     }
 
-    // 玩家背包 + 快捷栏
+    // Player inventory + hotbar
     mk('div', 'win-sep', win);
     slotGrid(win, 'main', 27, 9);
     var hb = slotGrid(win, 'hotbar', 9, 9);
@@ -273,7 +273,7 @@ var UI = (function () {
   }
 
   function buildCreative(win, title) {
-    title.textContent = '物品栏 (创造)';
+    title.textContent = 'Inventory (Creative)';
     var wrap = mk('div', 'creative-wrap', win);
     var grid = mk('div', 'slot-grid creative-grid', wrap);
     grid.style.gridTemplateColumns = 'repeat(9, 44px)';
@@ -285,7 +285,7 @@ var UI = (function () {
       slotEls.push(s);
     }
     var tr = mk('div', 'win-row', win);
-    mk('div', 'win-label', tr).textContent = '丢弃 →';
+    mk('div', 'win-label', tr).textContent = 'Discard →';
     var trash = mk('div', 'slot trash-slot', tr);
     trash.dataset.area = 'trash';
     trash.dataset.idx = 0;
@@ -307,7 +307,7 @@ var UI = (function () {
       if (area === 'trash') continue;
       renderSlotEl(s, Inv.getSlot(area, +s.dataset.idx));
     }
-    // 鼠标物品
+    // Cursor item
     var cur = Inv.cursorStack();
     if (cur) {
       els.cursorItem.style.display = 'block';
@@ -321,12 +321,12 @@ var UI = (function () {
     } else {
       els.cursorItem.style.display = 'none';
     }
-    // 快捷栏同步
+    // Hotbar sync
     var slots = Inv.slots();
     for (i = 0; i < 9; i++) renderSlotEl(hotbarEls[i], slots[i]);
   }
 
-  // 熔炉进度 (打开时每帧)
+  // Furnace progress (every frame while open)
   function updateOpenContainer() {
     if (openType !== 'furnace' || !openBEPos) return;
     var be = Game.world().getBE(openBEPos[0], openBEPos[1], openBEPos[2]);
@@ -350,30 +350,30 @@ var UI = (function () {
     var x = Math.floor(P.pos[0]), y = Math.floor(P.pos[1]), z = Math.floor(P.pos[2]);
     var w = Game.world();
     var biome = Gen.BIOME_NAMES[Gen.biomeAt(x, z)] || '?';
-    var dirs = ['南 (+Z)', '西 (-X)', '北 (-Z)', '东 (+X)'];
+    var dirs = ['South (+Z)', 'West (-X)', 'North (-Z)', 'East (+X)'];
     var dirIdx = Math.round(Util.mod(P.yaw, Math.PI * 2) / (Math.PI / 2)) % 4;
     els.f3.textContent =
       'MineJS | ' + fps + ' fps\n' +
       'XYZ: ' + P.pos[0].toFixed(2) + ' / ' + P.pos[1].toFixed(2) + ' / ' + P.pos[2].toFixed(2) + '\n' +
-      '方块: ' + x + ' ' + y + ' ' + z + '  朝向: ' + dirs[dirIdx] + '\n' +
-      '群系: ' + biome + '  亮度: 天' + w.getSky(x, y, z) + ' / 块' + w.getBlk(x, y, z) + '\n' +
-      '时间: ' + w.time + ' (第' + (w.day + 1) + '天)  种子: ' + w.seedStr + '\n' +
-      '区块: ' + w.columns.size + '  实体: ' + Ent.list().length + '  粒子: ' + Ent.particles().length + '\n' +
-      '模式: ' + (P.gamemode === 'creative' ? '创造' : '生存') + (P.flying ? ' (飞行)' : '') +
+      'Block: ' + x + ' ' + y + ' ' + z + '  Facing: ' + dirs[dirIdx] + '\n' +
+      'Biome: ' + biome + '  Light: sky ' + w.getSky(x, y, z) + ' / block ' + w.getBlk(x, y, z) + '\n' +
+      'Time: ' + w.time + ' (Day ' + (w.day + 1) + ')  Seed: ' + w.seedStr + '\n' +
+      'Chunks: ' + w.columns.size + '  Entities: ' + Ent.list().length + '  Particles: ' + Ent.particles().length + '\n' +
+      'Mode: ' + (P.gamemode === 'creative' ? 'Creative' : 'Survival') + (P.flying ? ' (flying)' : '') +
       (window.__ts ? '\n' + window.__ts : '');
   }
 
-  // ---------- 死亡 ----------
+  // ---------- Death ----------
   function showDeath(cause) {
     els.deathScreen.style.display = 'flex';
-    $('death-cause').textContent = '死因: ' + cause;
+    $('death-cause').textContent = 'Cause: ' + cause;
     document.exitPointerLock && document.exitPointerLock();
   }
   function hideDeath() {
     els.deathScreen.style.display = 'none';
   }
 
-  // ---------- 成就 ----------
+  // ---------- Achievements ----------
   function toast(title, sub, iconId) {
     var t = mk('div', 'toast', els.toasts);
     if (iconId !== undefined) {

@@ -1,15 +1,15 @@
-// ============ util.js — 数学 / 随机 / 噪声 / 矩阵 ============
+// ============ util.js — Math / RNG / Noise / Matrix ============
 'use strict';
 var Util = (function () {
 
-  // ---------- 基础 ----------
+  // ---------- Basics ----------
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function smooth(t) { return t * t * (3 - 2 * t); }
   function mod(a, n) { return ((a % n) + n) % n; }
 
-  // ---------- 随机数 ----------
-  // mulberry32: 快速可种子化 PRNG
+  // ---------- RNG ----------
+  // mulberry32: fast seedable PRNG
   function mulberry32(seed) {
     var a = seed >>> 0;
     return function () {
@@ -19,7 +19,7 @@ var Util = (function () {
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  // 整数坐标哈希 → [0,1)，用于确定性的逐位置随机（树、矿等跨区块特征）
+  // Integer coordinate hash → [0,1), for deterministic per-position random (trees, ores, and other cross-chunk features)
   function hash2(seed, x, z) {
     var h = seed ^ Math.imul(x, 374761393) ^ Math.imul(z, 668265263);
     h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -32,7 +32,7 @@ var Util = (function () {
     h ^= h >>> 16;
     return (h >>> 0) / 4294967296;
   }
-  // 字符串 → 32位种子
+  // String → 32-bit seed
   function strSeed(s) {
     s = String(s);
     if (/^-?\d+$/.test(s)) return parseInt(s, 10) | 0;
@@ -41,7 +41,7 @@ var Util = (function () {
     return h | 0;
   }
 
-  // ---------- Perlin 噪声 ----------
+  // ---------- Perlin noise ----------
   function Perlin(seed) {
     var rand = mulberry32(seed);
     var p = new Uint8Array(512);
@@ -66,7 +66,7 @@ var Util = (function () {
     var A = p[X] + Y, B = p[X + 1] + Y;
     function g(h, x, y) {
       h = (h & 7) * 3;
-      // 用 3D 梯度表的前 8 个的 xy 分量
+      // use the xy components of the first 8 entries of the 3D gradient table
       return GRAD3[h] * x + GRAD3[h + 1] * y;
     }
     var n00 = g(p[A], x, y), n10 = g(p[B], x - 1, y);
@@ -92,7 +92,7 @@ var Util = (function () {
       lerp(lerp(g(p[AA + 1], x, y, z - 1), g(p[BA + 1], x - 1, y, z - 1), u),
            lerp(g(p[AB + 1], x, y - 1, z - 1), g(p[BB + 1], x - 1, y - 1, z - 1), u), v), w);
   };
-  // 分形布朗运动
+  // fractal Brownian motion
   Perlin.prototype.fbm2 = function (x, y, oct, lac, gain) {
     var amp = 1, freq = 1, sum = 0, norm = 0;
     for (var i = 0; i < oct; i++) {
@@ -109,10 +109,10 @@ var Util = (function () {
     }
     return sum / norm;
   };
-  // 山脊噪声 (用于洞穴: |n| 小 → 通道)
+  // ridge noise (used for caves: small |n| → tunnel)
   Perlin.prototype.ridge2 = function (x, y) { return 1 - Math.abs(this.noise2(x, y)); };
 
-  // ---------- mat4 (列主序, 兼容 WebGL) ----------
+  // ---------- mat4 (column-major, WebGL-compatible) ----------
   var M = {
     create: function () { var m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m; },
     identity: function (m) { m.fill(0); m[0] = m[5] = m[10] = m[15] = 1; return m; },
@@ -178,8 +178,8 @@ var Util = (function () {
     clone: function (m) { return new Float32Array(m); }
   };
 
-  // 视图矩阵: 相机在 eye, 偏航 yaw(绕y), 俯仰 pitch(绕x)
-  // 约定: yaw=0 朝 -z, yaw 增大向左转(逆时针俯视); pitch 正=抬头
+  // view matrix: camera at eye, yaw (around y), pitch (around x)
+  // convention: yaw=0 faces -z, increasing yaw turns left (counterclockwise from above); positive pitch = look up
   function viewMatrix(out, eye, yaw, pitch) {
     M.identity(out);
     M.rotateX(out, out, -pitch);
@@ -192,7 +192,7 @@ var Util = (function () {
     return [-Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp];
   }
 
-  // 视锥平面提取 (from VP matrix), 返回 6 平面 [a,b,c,d]
+  // frustum plane extraction (from VP matrix), returns 6 planes [a,b,c,d]
   function frustumPlanes(vp, out) {
     out = out || [];
     var rows = [
@@ -210,7 +210,7 @@ var Util = (function () {
     }
     return out;
   }
-  // AABB 与视锥相交测试
+  // AABB vs frustum intersection test
   function aabbInFrustum(planes, x0, y0, z0, x1, y1, z1) {
     for (var i = 0; i < 6; i++) {
       var p = planes[i];

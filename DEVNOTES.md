@@ -1,81 +1,83 @@
-# MineJS 开发笔记（内部架构文档）
+**English** · [中文](DEVNOTES.zh-CN.md)
 
-网页版 Minecraft 复刻。零依赖，原生 WebGL2，经典 script 标签（非 module，保证 file:// 直开）。
-双击 index.html 即玩。所有贴图程序化生成（canvas 像素画），无外部资源。
+# MineJS Dev Notes (internal architecture doc)
 
-## 文件与加载顺序（index.html 中的 script 顺序 = 依赖顺序）
+A browser-based Minecraft clone. Zero dependencies, native WebGL2, classic script tags (not modules, so it opens directly via file://).
+Double-click index.html to play. All textures are generated procedurally (canvas pixel art), no external assets.
+
+## Files & load order (the script order in index.html = dependency order)
 1. js/util.js      — Util: RNG(mulberry32/hash), Perlin 2D/3D + fBm, mat4, frustum, clamp/lerp
-2. js/blocks.js    — B(方块id常量), BLOCKS[id]规格, IT(物品id), ITEMS[], RECIPES, SMELT, FUEL, 中文名
-3. js/textures.js  — Tex: 512x512 atlas 画块贴图; tile painter 框架; Tex.uv(idx)
-4. js/textures2.js — 物品/工具像素画、生物皮肤、裂纹、太阳月亮、粒子、GUI 图标 dataURL
-5. js/lighting.js  — Light: 天光/方块光 BFS 增减、列初始化、区域重算
-6. js/worldgen.js  — Gen: 群系/高度/洞穴/矿脉/树/装饰; 跨区块树用确定性 hash
-7. js/world.js     — World: 列存储、get/setBlock、tick(流体/随机tick/方块实体)、爆炸、存档RLE
-8. js/mesher.js    — Mesher.buildColumn(world,col) → {opq, trans} 顶点数据 (AO+平滑光照)
-9. js/render.js    — Render: GL 管线、区块/天空/云/日月星/实体/粒子/选框/裂纹/手持
-10. js/entities.js — Ent: 实体物理、掉落物、下落方块、TNT、生物+AI、生成器
-11. js/player.js   — Player: 输入、移动(走/跑/潜/游)、挖掘/放置/攻击、生命饥饿
-12. js/inventory.js— Inv: 槽位、合成匹配(shaped/shapeless+镜像)、熔炉逻辑
-13. js/ui.js       — UI: HUD(血量饥饿氧气热栏)、容器窗口、拖拽、tooltip
-14. js/screens.js  — Screens: 标题/暂停/选项/死亡/F3/成就toast/多世界管理
-15. js/audio.js    — Sfx: WebAudio 合成音效 + 生成式音乐
-16. js/main.js     — Game: 主循环、区块管理、20Hz tick、存档、TEST 钩子
+2. js/blocks.js    — B(block id constants), BLOCKS[id] specs, IT(item ids), ITEMS[], RECIPES, SMELT, FUEL, English names
+3. js/textures.js  — Tex: 512x512 atlas block textures; tile painter framework; Tex.uv(idx)
+4. js/textures2.js — item/tool pixel art, mob skins, cracks, sun & moon, particles, GUI icon dataURLs
+5. js/lighting.js  — Light: skylight/block light BFS add & remove, column initialization, region recompute
+6. js/worldgen.js  — Gen: biomes/height/caves/ore veins/trees/decorations; cross-chunk trees use a deterministic hash
+7. js/world.js     — World: column storage, get/setBlock, tick(fluids/random tick/block entities), explosions, save RLE
+8. js/mesher.js    — Mesher.buildColumn(world,col) → {opq, trans} vertex data (AO + smooth lighting)
+9. js/render.js    — Render: GL pipeline, chunks/sky/clouds/sun-moon-stars/entities/particles/selection box/cracks/held item
+10. js/entities.js — Ent: entity physics, drops, falling blocks, TNT, mobs + AI, spawner
+11. js/player.js   — Player: input, movement (walk/run/sneak/swim), mining/placing/attacking, health & hunger
+12. js/inventory.js— Inv: slots, recipe matching (shaped/shapeless + mirror), furnace logic
+13. js/ui.js       — UI: HUD (health, hunger, oxygen, hotbar), container windows, drag & drop, tooltip
+14. js/screens.js  — Screens: title/pause/options/death/F3/achievement toast/multi-world management
+15. js/audio.js    — Sfx: WebAudio synthesized sound effects + generative music
+16. js/main.js     — Game: main loop, chunk management, 20Hz tick, saving, TEST hooks
 
-## 核心约定
-- 坐标: x东 y上(0..127) z南。列(column) = 16x16x128。key = cx+","+cz
-- 列内索引 idx = x | (z<<4) | (y<<8)  (x,z:0-15, y:0-127), 数组长 32768
+## Core conventions
+- Coordinates: x east, y up (0..127), z south. Column = 16x16x128. key = cx+","+cz
+- In-column index idx = x | (z<<4) | (y<<8)  (x,z:0-15, y:0-127), array length 32768
 - column = {cx,cz, blocks:Uint8Array, meta:Uint8Array, sky:Uint8Array, blk:Uint8Array,
-  height:Uint8Array(256, 最高不透明y+1), state(0空/1已生成/2可渲染), dirtyMesh,
+  height:Uint8Array(256, highest opaque y+1), state(0 empty/1 generated/2 renderable), dirtyMesh,
   blockEntities:Map<idx,obj>, modified:bool, mesh:{opq,trans}, biomes:Uint8Array(256)}
-- World API: getBlock/getMeta/setBlock(x,y,z,id,meta,flags) flags: 1=光照 2=网格 4=邻居更新
+- World API: getBlock/getMeta/setBlock(x,y,z,id,meta,flags) flags: 1=lighting 2=mesh 4=neighbor update
   getSky/getBlk/getColumn/ensureColumn/raycast(o,d,max)/explode(x,y,z,power)
-- setBlock 边界变更要标记相邻(含对角, AO 需要) 列 dirtyMesh
-- 光照: 两个 Uint8Array (sky, blk) 0..15。天光15垂直向下不衰减。水不透明度2、树叶1。
-  夜晚亮度 = max(blk, sky*dayFactor) 在 shader 完成
-- 方块规格 BLOCKS[id]: {name, tex:{all|top,bottom,side,front,...}, solid, opaque, opacity,
-  hard(秒), tool('pick'|'axe'|'shovel'|null), tier(0木1石2铁3钻, 掉落所需), drops(meta,toolInfo)=>[],
+- setBlock boundary changes must mark adjacent columns (including diagonals, needed for AO) dirtyMesh
+- Lighting: two Uint8Arrays (sky, blk) 0..15. Skylight 15 goes straight down with no attenuation. Water opacity 2, leaves 1.
+  Night brightness = max(blk, sky*dayFactor), computed in the shader
+- Block spec BLOCKS[id]: {name, tex:{all|top,bottom,side,front,...}, solid, opaque, opacity,
+  hard(seconds), tool('pick'|'axe'|'shovel'|null), tier(0 wood 1 stone 2 iron 3 diamond, required to drop), drops(meta,toolInfo)=>[],
   light, render('cube'|'cross'|'liquid'|'torch'|'ladder'|'snow'|'crop'|'none'), sound, tint,
-  cutout, transp, gravity, climb, box(碰撞箱: null=无 / [x0,y0,z0,x1,y1,z1])}
-- 物品 id: 方块 1..99, 物品 100+。ITEMS[id]={name,tile,stack,tool:{type,tier,speed,dur,dmg},food:{pts,sat},fuel,burnRes}
-- 物品堆 stack = {id,n,dur?}
-- 实体: {pos:[x,y,z](脚底中心), vel, w(半宽), h, yaw, hp, onGround, ...} 每轴扫掠碰撞
-- 主循环: rAF 渲染 + 累加器 20Hz 世界tick; 玩家移动按帧
-- 时间: t=0..24000 ticks (20分钟一天), 白天0-12000, 日落12000-13800, 夜13800-22200, 日出22200-24000
-- 存档: localStorage key "minejs:<wid>:meta|col:<cx>,<cz>", 列 RLE→base64, 仅 modified 列
-- 测试: URL ?test=1 暴露 window.TEST {setTime,tp,look,mine,place,give,spawn,perf,ready}
+  cutout, transp, gravity, climb, box(collision box: null=none / [x0,y0,z0,x1,y1,z1])}
+- Item ids: blocks 1..99, items 100+. ITEMS[id]={name,tile,stack,tool:{type,tier,speed,dur,dmg},food:{pts,sat},fuel,burnRes}
+- Item stack = {id,n,dur?}
+- Entity: {pos:[x,y,z](center of feet), vel, w(half-width), h, yaw, hp, onGround, ...} swept collision per axis
+- Main loop: rAF render + accumulator 20Hz world tick; player movement per frame
+- Time: t=0..24000 ticks (one day = 20 minutes), daytime 0-12000, sunset 12000-13800, night 13800-22200, sunrise 22200-24000
+- Save: localStorage key "minejs:<wid>:meta|col:<cx>,<cz>", column RLE→base64, only modified columns
+- Test: URL ?test=1 exposes window.TEST {setTime,tp,look,mine,place,give,spawn,perf,ready}
 
-## 验证流程
-- node --check 每个文件
-- test/logic-test.js: node 跑 util+blocks+lighting+worldgen+world+mesher+inventory 的逻辑测试
-- test/shot.sh: headless Chrome 截图 + console 错误收集 (file:// + ?test=1)
+## Validation workflow
+- node --check on every file
+- test/logic-test.js: run logic tests for util+blocks+lighting+worldgen+world+mesher+inventory under node
+- test/shot.sh: headless Chrome screenshot + console error collection (file:// + ?test=1)
 
-## 进度 — 全部完成 ✓
-- [x] 全部 16 个 js 文件 + index.html
-- [x] node 逻辑测试 49/49 通过 (test/logic-test.js)
-- [x] 浏览器截图验证: 地形/夜晚/洞穴/群系/生物/UI(物品栏/工作台/熔炉/创造)/
-      裂纹/选框/第三人称/爆炸/死亡界面/标题界面 全部目视确认
-- [x] 浏览器内闭环断言: 挖掘→掉落→拾取 ✓, 存档→重载→方块与背包恢复 ✓,
-      爆炸伤害+击退+回血 ✓, 900刻浸泡无报错 ✓
+## Progress — all done ✓
+- [x] All 16 js files + index.html
+- [x] node logic tests 49/49 passing (test/logic-test.js)
+- [x] Browser screenshot verification: terrain/night/caves/biomes/mobs/UI(inventory/crafting table/furnace/creative)/
+      cracks/selection box/third person/explosion/death screen/title screen all visually confirmed
+- [x] In-browser closed-loop assertions: mine→drop→pickup ✓, save→reload→blocks and inventory restored ✓,
+      explosion damage+knockback+regen ✓, 900-tick soak with no errors ✓
 - [x] README
 
-## headless 测试经验 (重要)
-- chrome --headless=new --screenshot --virtual-time-budget 的截图是"较早的绘制帧",
-  DOM 是最终态而 canvas 可能滞后; 帧数与预算关系不可靠
-- 对策: 测试指令全部在就绪后第1帧同步执行 (testFrameTick stage1);
-  需要时间推进的用 &warp=N 同步快进游戏刻; 时间用 &time=N 每刻钉死
-- 测试 URL 指令: test/seed/dist/mode/time/tp/look/give/sel/mob/freeze/biome/cave/
-  setblock(y=99贴地)/open/boom/mine/use/press/third/crack/warp/report/mute/savetest
-- 音效在 warp 中会狂建音频节点拖死页面 → &mute=1
-- 测试模式不写 localStorage (savetest 除外, 用后自删)
+## Headless testing notes (important)
+- The screenshot from chrome --headless=new --screenshot --virtual-time-budget is an "earlier rendered frame";
+  the DOM is in its final state but the canvas may lag; the relationship between frame count and budget is unreliable
+- Workaround: run all test commands synchronously on the 1st frame after ready (testFrameTick stage1);
+  when time advancement is needed, use &warp=N to synchronously fast-forward game ticks; pin time with &time=N every tick
+- Test URL commands: test/seed/dist/mode/time/tp/look/give/sel/mob/freeze/biome/cave/
+  setblock(y=99 on the ground)/open/boom/mine/use/press/third/crack/warp/report/mute/savetest
+- Sound effects during warp frantically create audio nodes and bog down the page → &mute=1
+- Test mode does not write localStorage (except savetest, which deletes itself after use)
 
-## 既定设计参数
-- 世界高128, 海平面62, 默认渲染距离6列(可调3-10)
-- 群系: 海洋/沙滩/平原/森林/桦木林/针叶林/雪原/沙漠/山地(由大陆度+温度+湿度+山峰噪声)
-- 矿: 煤16次y5-80 / 铁12次y5-54 / 金2次y5-30 / 钻1次y5-15, 随机游走团
-- 生物: 猪牛羊(被动) 僵尸(夜, 白天燃烧) 苦力怕(爆炸) 上限: 敌对12 被动10
-- 合成: 木板/木棍/工作台/熔炉/工具5种x5阶/火把/箱子/梯子/TNT/面包/桶/打火石/储物块/石砖/雪块/南瓜灯
-- 熔炼: 圆石→石头, 沙→玻璃, 铁金矿→锭, 原木→木炭, 生肉→熟肉; 燃料: 煤/木/岩浆桶
-- 农业: 锄→耕地, 种子(打草掉), 小麦8阶段, 面包; 踩踏耕地变回泥土
-- 流体: 水平传播水7格/岩浆3格, 垂直无限, 2源水相邻+下方实体→新源(无限水), 水遇岩浆→黑曜石/圆石
-- 重力方块: 沙/沙砾(下落实体); 沙砾10%掉燧石
-- 红石/下界/附魔/经验/盔甲/床/门: 不做(盔甲门床为可选扩展)
+## Design parameters
+- World height 128, sea level 62, default render distance 6 columns (adjustable 3-10)
+- Biomes: Ocean/Beach/Plains/Forest/Birch Forest/Taiga/Snowy Tundra/Desert/Mountains (from continentalness + temperature + humidity + peak noise)
+- Ores: Coal 16x y5-80 / Iron 12x y5-54 / Gold 2x y5-30 / Diamond 1x y5-15, random-walk blobs
+- Mobs: pig/cow/sheep (passive), zombie (night, burns in daytime), creeper (explodes); caps: hostile 12, passive 10
+- Crafting: Planks/sticks/Crafting Table/Furnace/5 tool types x 5 tiers/Torch/Chest/ladder/TNT/bread/bucket/flint and steel/storage block/stone bricks/snow block/jack o'lantern
+- Smelting: Cobblestone→stone, sand→glass, iron & gold ore→ingots, Log→Charcoal, raw meat→cooked meat; fuel: Coal/wood/lava bucket
+- Farming: hoe→farmland, seeds (drop from breaking grass), wheat 8 stages, bread; trampling farmland turns it back into dirt
+- Fluids: horizontal spread water 7 blocks / lava 3 blocks, vertical infinite, 2 source water blocks adjacent + a solid block below → new source (infinite water), water meeting lava → Obsidian/Cobblestone
+- Gravity blocks: sand/gravel (falling entities); gravel has a 10% chance to drop flint
+- Redstone/Nether/enchanting/experience/armor/beds/doors: not implemented (armor, doors, and beds are optional extensions)
