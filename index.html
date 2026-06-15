@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>MineJS — 我的世界 网页版</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", monospace; color: #fff; }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: default; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: absolute; inset: 0; pointer-events: none; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    transform: translate(-50%, -50%); mix-blend-mode: difference; }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #ddd; }
+  #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+  #crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+
+  #hotbar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 2px; background: rgba(0,0,0,0.35); padding: 3px; border-radius: 4px; }
+  .slot { position: relative; width: 44px; height: 44px; background: rgba(60,60,60,0.85);
+    border: 2px solid; border-color: #2a2a2a #6e6e6e #6e6e6e #2a2a2a; cursor: pointer; }
+  .hotbar-slot.selected { border: 2px solid #fff; box-shadow: 0 0 0 2px #fff; z-index: 1; }
+  .slot-icon { position: absolute; inset: 2px; width: 36px; height: 36px; image-rendering: pixelated; pointer-events: none; }
+  .slot-count { position: absolute; right: 2px; bottom: 0; font-size: 15px; font-weight: bold;
+    color: #fff; text-shadow: 2px 2px 0 #3f3f3f; pointer-events: none; z-index: 2; }
+  .slot-dur { position: absolute; left: 3px; right: 3px; bottom: 3px; height: 3px; background: #222; display: none; pointer-events: none; }
+  .slot-dur-fill { height: 100%; background: #5be059; }
+
+  #stats-wrap { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+    width: 416px; display: flex; justify-content: space-between; pointer-events: none; }
+  .stat-row { display: flex; gap: 1px; }
+  .stat-icon { width: 18px; height: 18px; image-rendering: pixelated; }
+  #hearts.low { animation: shake 0.5s infinite; }
+  @keyframes shake { 0%,100% { transform: translateY(0); } 25% { transform: translateY(-1px); } 75% { transform: translateY(1px); } }
+  #food { flex-direction: row-reverse; }
+  #air { position: absolute; bottom: 84px; left: 50%; transform: translateX(calc(-50% + 104px));
+    display: none; gap: 1px; flex-direction: row-reverse; }
+
+  #held-name { position: absolute; bottom: 96px; left: 50%; transform: translateX(-50%);
+    font-size: 17px; color: #fff; text-shadow: 2px 2px 0 rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.4s; }
+  #action-message { position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%);
+    font-size: 15px; color: #ffe; text-shadow: 2px 2px 0 rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.4s; }
+
+  #damage-flash { position: absolute; inset: 0; background: rgba(255,0,0,0.4); opacity: 0;
+    transition: opacity 0.3s; pointer-events: none; z-index: 5; }
+  #screen-tint { position: absolute; inset: 0; display: none; pointer-events: none; z-index: 4; }
+
+  #f3 { position: absolute; top: 6px; left: 6px; font: 13px/1.5 monospace; white-space: pre;
+    background: rgba(0,0,0,0.4); padding: 6px 10px; display: none; z-index: 6; pointer-events: none; }
+
+  /* ---------- 窗口 ---------- */
+  #winroot { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); z-index: 10; }
+  .window { background: #c6c6c6; border: 3px solid; border-color: #fff #555 #555 #fff;
+    border-radius: 3px; padding: 14px 16px; color: #3f3f3f; max-height: 92vh; overflow-y: auto; }
+  .win-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #3f3f3f; }
+  .window .slot { background: #8b8b8b; border-color: #373737 #fff #fff #373737; }
+  .slot-grid { display: grid; gap: 2px; }
+  .win-sep { height: 12px; }
+  .win-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .win-label { font-size: 14px; color: #3f3f3f; }
+  .craft-area { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .craft-arrow { font-size: 30px; color: #8b8b8b; font-weight: bold; }
+  .result-slot { width: 52px; height: 52px; }
+  .result-slot .slot-icon { width: 44px; height: 44px; }
+  .furnace-area { display: flex; align-items: center; gap: 18px; margin-bottom: 8px; }
+  .furnace-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .furnace-flame { width: 18px; height: 18px; background: #555; position: relative; }
+  .furnace-flame-fill { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(#ffd24a, #ff8c1a); }
+  .furnace-arrow { width: 60px; height: 14px; background: #555; position: relative; clip-path: polygon(0 30%, 70% 30%, 70% 0, 100% 50%, 70% 100%, 70% 70%, 0 70%); }
+  .furnace-arrow-fill { position: absolute; top: 0; bottom: 0; left: 0; background: #fff; }
+  .creative-wrap { max-height: 380px; overflow-y: auto; padding-right: 6px; margin-bottom: 8px; }
+  .trash-slot { display: flex; align-items: center; justify-content: center; font-size: 22px; color: #a33; }
+  #cursor-item { position: fixed; pointer-events: none; z-index: 20; display: none;
+    transform: translate(-22px, -22px); width: 44px; height: 44px; }
+  #cursor-item img { width: 40px; height: 40px; image-rendering: pixelated; }
+  #cursor-item .slot-count { z-index: 21; }
+  #tooltip { position: fixed; display: none; background: rgba(16,0,16,0.92); border: 2px solid #25015a;
+    padding: 4px 8px; font-size: 14px; color: #fff; z-index: 22; pointer-events: none; border-radius: 3px; }
+
+  /* ---------- 提示 toast ---------- */
+  #toasts { position: absolute; top: 10px; right: 10px; z-index: 15; display: flex; flex-direction: column; gap: 8px; }
+  .toast { display: flex; align-items: center; gap: 10px; background: #212121; border: 2px solid;
+    border-color: #555 #1a1a1a #1a1a1a #555; padding: 8px 14px; transform: translateX(120%); transition: transform 0.4s; min-width: 220px; }
+  .toast.show { transform: translateX(0); }
+  .toast img { width: 32px; height: 32px; image-rendering: pixelated; }
+  .toast-title { color: #ff5; font-size: 14px; font-weight: bold; }
+  .toast-sub { color: #ccc; font-size: 12px; }
+
+  /* ---------- 全屏界面 ---------- */
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; z-index: 30;
+    background: linear-gradient(rgba(16,12,8,0.92), rgba(24,20,14,0.94)),
+      repeating-conic-gradient(#3d2f1f 0% 25%, #46362a 0% 50%) 0 0/64px 64px; }
+  .screen.overlay { background: rgba(0,0,0,0.6); }
+  .screen.overlay-red { background: rgba(120,0,0,0.5); }
+  .logo { font-size: 64px; letter-spacing: 4px; color: #fff;
+    text-shadow: 4px 4px 0 #3f3f3f, -2px -2px 0 #555; font-weight: 900; }
+  .subtitle { color: #ff5; font-size: 16px; margin-top: -10px; transform: rotate(-3deg);
+    text-shadow: 2px 2px 0 #3a3a00; }
+  .screen h2 { font-size: 28px; text-shadow: 2px 2px 0 #3f3f3f; }
+  .mc-btn { display: block; width: 320px; padding: 12px; font-size: 16px; font-family: inherit;
+    color: #fff; background: linear-gradient(#8d8d8d, #6e6e6e); border: 2px solid;
+    border-color: #c8c8c8 #2a2a2a #2a2a2a #c8c8c8; cursor: pointer; text-shadow: 1px 1px 0 #333; }
+  .mc-btn:hover { background: linear-gradient(#9d9dc4, #7e7ea4); border-color: #fff #222 #222 #fff; }
+  .mc-btn.small { width: auto; padding: 6px 14px; font-size: 14px; }
+  .mc-btn.danger:hover { background: linear-gradient(#c46a6a, #a44e4e); }
+  .screen label { display: flex; flex-direction: column; gap: 5px; font-size: 14px; color: #ccc; width: 320px; }
+  .screen input[type=text], .screen input:not([type]), .screen select {
+    padding: 9px; font-size: 15px; background: #111; color: #fff; border: 2px solid #888; font-family: inherit; }
+  #world-list { width: 460px; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .world-row { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.45);
+    padding: 10px 14px; border: 1px solid #555; }
+  .world-info { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .world-info b { font-size: 16px; }
+  .world-info span { font-size: 12px; color: #aaa; }
+  .world-empty { text-align: center; color: #999; padding: 18px; }
+  .controls-hint { font-size: 13px; color: #999; margin-top: 16px; max-width: 600px; text-align: center; line-height: 1.8; }
+  .opt-row { display: flex; align-items: center; gap: 14px; width: 420px; font-size: 15px; }
+  .opt-row span:first-child { width: 110px; text-align: right; }
+  .opt-row span:last-child { width: 70px; color: #ff5; }
+  .opt-row input[type=range] { flex: 1; }
+  #loading-bar { width: 360px; height: 12px; background: #222; border: 2px solid #888; }
+  #loading-fill { height: 100%; width: 0; background: #4cbb4c; transition: width 0.15s; }
+  #death-cause { font-size: 16px; color: #fdd; }
+  .hint-box { background: rgba(0,0,0,0.8); padding: 22px 44px; font-size: 20px; border: 2px solid #fff; cursor: pointer; }
+  #lock-hint { background: rgba(0,0,0,0.3); z-index: 40; cursor: pointer; }
+  #webgl-fail { z-index: 50; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="stats-wrap">
+    <div id="hearts" class="stat-row"></div>
+    <div id="food" class="stat-row"></div>
+  </div>
+  <div id="air" class="stat-row"></div>
+  <div id="hotbar"></div>
+  <div id="held-name"></div>
+  <div id="action-message"></div>
+</div>
+<div id="screen-tint"></div>
+<div id="damage-flash"></div>
+<div id="f3"></div>
+<div id="toasts"></div>
+<div id="winroot"></div>
+<div id="cursor-item"></div>
+<div id="tooltip"></div>
+
+<div id="lock-hint" class="screen" style="display:none"><div class="hint-box">点击继续游戏</div></div>
+
+<div id="title-screen" class="screen" style="display:none">
+  <h1 class="logo">MineJS</h1>
+  <div class="subtitle">我的世界 · 网页复刻版</div>
+  <div id="world-list"></div>
+  <button id="btn-new-world" class="mc-btn">创建新世界</button>
+  <div class="controls-hint">
+    WASD 移动 · 空格 跳跃 · Shift 潜行 · 双击W 疾跑 · 左键 挖掘/攻击 · 右键 放置/使用<br>
+    E 物品栏 · Q 丢弃 · 滚轮/数字键 切换物品 · F3 调试 · F5 第三人称 · Esc 暂停
+  </div>
+</div>
+
+<div id="create-screen" class="screen" style="display:none">
+  <h2>创建新世界</h2>
+  <label>世界名称<input id="world-name" placeholder="新的世界" maxlength="24"></label>
+  <label>种子 (留空随机)<input id="world-seed" placeholder="随机"></label>
+  <label>游戏模式
+    <select id="world-mode">
+      <option value="survival">生存模式</option>
+      <option value="creative">创造模式</option>
+    </select>
+  </label>
+  <button id="btn-create-go" class="mc-btn">创建世界</button>
+  <button id="btn-create-back" class="mc-btn">返回</button>
+</div>
+
+<div id="pause-screen" class="screen overlay" style="display:none">
+  <h2>游戏暂停</h2>
+  <button id="btn-resume" class="mc-btn">回到游戏</button>
+  <button id="btn-options" class="mc-btn">选项...</button>
+  <button id="btn-quit" class="mc-btn">保存并退出</button>
+</div>
+
+<div id="options-screen" class="screen overlay" style="display:none">
+  <h2>选项</h2>
+  <div class="opt-row"><span>渲染距离</span><input type="range" id="opt-dist" min="3" max="10" step="1"><span id="opt-dist-val"></span></div>
+  <div class="opt-row"><span>视场角 FOV</span><input type="range" id="opt-fov" min="60" max="100" step="1"><span id="opt-fov-val"></span></div>
+  <div class="opt-row"><span>鼠标灵敏度</span><input type="range" id="opt-sens" min="0.2" max="3" step="0.1"><span id="opt-sens-val"></span></div>
+  <div class="opt-row"><span>音量</span><input type="range" id="opt-vol" min="0" max="1" step="0.05"><span id="opt-vol-val"></span></div>
+  <div class="opt-row"><span>音乐</span><input type="checkbox" id="opt-music" checked><span></span></div>
+  <button id="btn-options-back" class="mc-btn">完成</button>
+</div>
+
+<div id="death-screen" class="screen overlay-red" style="display:none">
+  <h2>你死了!</h2>
+  <div id="death-cause"></div>
+  <button id="btn-respawn" class="mc-btn">重生</button>
+  <button id="btn-death-quit" class="mc-btn">退出到标题界面</button>
+</div>
+
+<div id="loading-screen" class="screen" style="display:none">
+  <h2 id="loading-msg">加载中...</h2>
+  <div id="loading-bar"><div id="loading-fill"></div></div>
+</div>
+
+<div id="webgl-fail" class="screen" style="display:none">
+  <h2>需要 WebGL2 支持</h2>
+  <div id="webgl-fail-msg"></div>
+  <div>请使用最新版 Chrome / Edge / Safari / Firefox</div>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/textures2.js"></script>
+<script src="js/lighting.js"></script>
+<script src="js/worldgen.js"></script>
+<script src="js/world.js"></script>
+<script src="js/mesher.js"></script>
+<script src="js/render.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/player.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/screens.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
